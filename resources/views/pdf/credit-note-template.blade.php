@@ -31,9 +31,18 @@
         }
         
         .header-content {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
+            width: 100%;
+        }
+        
+        .company-info {
+            float: left;
+            width: 60%;
+        }
+        
+        .document-title {
+            float: right;
+            width: 35%;
+            text-align: right;
         }
         
         .company-info h1 {
@@ -88,27 +97,28 @@
         }
         
         .details-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 0.75rem;
+            width: 100%;
         }
         
         .detail-row {
-            display: flex;
+            width: 48%;
+            float: left;
+            margin-right: 2%;
+            margin-bottom: 0.75rem;
         }
         
         .detail-label {
             color: #4b5563;
             font-weight: 500;
-            width: 5rem;
-            flex-shrink: 0;
             font-size: 0.875rem;
+            display: inline-block;
+            width: 80px;
         }
         
         .detail-value {
             font-weight: 500;
-            flex: 1;
             font-size: 0.875rem;
+            display: inline;
         }
         
         /* Status Badges */
@@ -208,14 +218,13 @@
             border-left: 4px solid #f59e0b;
             padding: 1rem;
             border-radius: 0.5rem;
-            display: flex;
-            align-items: center;
         }
         
         .alert-icon {
             font-size: 1.25rem;
-            margin-right: 0.75rem;
             color: #f59e0b;
+            float: left;
+            margin-right: 0.75rem;
         }
         
         .alert-content {
@@ -239,13 +248,20 @@
         .footer p {
             margin-bottom: 0.25rem;
         }
+        
+        /* Clearfix */
+        .clearfix:after {
+            content: "";
+            display: table;
+            clear: both;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <!-- Header -->
         <div class="header">
-            <div class="header-content">
+            <div class="header-content clearfix">
                 <div class="company-info">
                     <h1>The Blinds Outlet</h1>
                     <div class="company-address">
@@ -268,7 +284,7 @@
             <div class="section">
                 <div class="details-card">
                     <h3 class="details-title">Credit Note Details</h3>
-                    <div class="details-grid">
+                    <div class="details-grid clearfix">
                         <div class="detail-row">
                             <span class="detail-label">Reference:</span>
                             <span class="detail-value">

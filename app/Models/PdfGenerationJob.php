@@ -20,6 +20,7 @@ class PdfGenerationJob extends Model
         'status',
         'file_paths',
         'zip_path',
+        'single_pdf_path',
         'row_data',
         'row_index',
         'user_id',
@@ -58,24 +59,39 @@ class PdfGenerationJob extends Model
     public function deleteAssociatedFiles()
     {
         // Delete individual PDF files
-        if ($this->file_paths) {
+        if ($this->file_paths && is_array($this->file_paths)) {
             foreach ($this->file_paths as $filePath) {
-                if (file_exists($filePath)) {
-                    unlink($filePath);
+                $fullPath = storage_path('app/' . $filePath);
+                if (file_exists($fullPath)) {
+                    unlink($fullPath);
                 }
             }
         }
 
         // Delete ZIP file
-        if ($this->zip_path && file_exists($this->zip_path)) {
-            unlink($this->zip_path);
+        if ($this->zip_path) {
+            $fullZipPath = storage_path('app/' . $this->zip_path);
+            if (file_exists($fullZipPath)) {
+                unlink($fullZipPath);
+            }
+        }
+
+        // Delete single PDF file
+        if ($this->single_pdf_path) {
+            $fullSinglePdfPath = storage_path('app/' . $this->single_pdf_path);
+            if (file_exists($fullSinglePdfPath)) {
+                unlink($fullSinglePdfPath);
+            }
         }
 
         // Delete batch directory if empty
         if ($this->batch_id) {
             $batchDir = storage_path("app/pdfs/{$this->batch_id}");
-            if (is_dir($batchDir) && count(scandir($batchDir)) === 2) { // Only . and ..
-                rmdir($batchDir);
+            if (is_dir($batchDir)) {
+                $files = array_diff(scandir($batchDir), ['.', '..']);
+                if (empty($files)) {
+                    rmdir($batchDir);
+                }
             }
         }
     }
