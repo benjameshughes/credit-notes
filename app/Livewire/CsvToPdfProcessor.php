@@ -131,8 +131,8 @@ class CsvToPdfProcessor extends Component
             ->selectRaw('SUM(CASE WHEN status = "completed" THEN 1 ELSE 0 END) as completed_rows')
             ->selectRaw('SUM(CASE WHEN status = "failed" THEN 1 ELSE 0 END) as failed_rows')
             ->selectRaw('SUM(CASE WHEN status = "processing" THEN 1 ELSE 0 END) as processing_rows')
-            ->selectRaw('MAX(zip_path) as zip_path')
-            ->selectRaw('MAX(single_pdf_path) as single_pdf_path')
+            ->selectRaw('COALESCE(MAX(zip_path), "") as zip_path')
+            ->selectRaw('COALESCE(MAX(single_pdf_path), "") as single_pdf_path')
             ->groupBy('batch_id', 'original_filename')
             ->orderBy('created_at', 'desc')
             ->take(20)
@@ -166,8 +166,8 @@ class CsvToPdfProcessor extends Component
                 'progress' => $progress,
                 'zip_path' => $batch->zip_path,
                 'single_pdf_path' => $batch->single_pdf_path,
-                'download_available' => $batch->zip_path || $batch->single_pdf_path,
-                'is_single_pdf' => ! $batch->zip_path && $batch->single_pdf_path,
+                'download_available' => !empty($batch->zip_path) || !empty($batch->single_pdf_path),
+                'is_single_pdf' => empty($batch->zip_path) && !empty($batch->single_pdf_path),
                 'created_at' => $batch->created_at->format('M j, Y g:i A'),
             ];
         });

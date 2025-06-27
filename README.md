@@ -130,6 +130,16 @@ php artisan cache:clear
 php artisan view:clear
 ```
 
+### Maintenance
+
+```bash
+# Clean up old pending jobs (default: older than 30 minutes)
+php artisan jobs:cleanup-pending
+
+# Clean up pending jobs older than specific hours
+php artisan jobs:cleanup-pending --hours=2
+```
+
 ## How It Works
 
 ### CSV Processing Pipeline
@@ -149,22 +159,27 @@ php artisan view:clear
 - **`ProcessCsvToPdf`** - Queue job for individual PDF generation
 - **`PdfGenerationJob`** - Eloquent model tracking job progress with user relationships and file cleanup
 - **`PdfGenerationJobPolicy`** - Laravel policy for user authorization and job management permissions
-- **`JobProgressUpdated`** - Broadcast event for real-time updates
-- **Credit Note Template** - Blade template for PDF generation
+- **`JobProgressUpdated`** - Broadcast event for real-time updates using `ShouldBroadcastNow`
+- **`CleanupPendingJobs`** - Scheduled command to remove stuck pending jobs
+- **Credit Note Template** - Blade template for PDF generation (DomPDF compatible)
 
 ### File Structure
 
 ```
 app/
-├── Events/JobProgressUpdated.php      # Real-time progress broadcasting
-├── Jobs/ProcessCsvToPdf.php           # Background PDF generation
-├── Livewire/CsvToPdfProcessor.php     # Main UI component with user isolation
-├── Models/PdfGenerationJob.php        # Job tracking model with user relationships
-└── Policies/PdfGenerationJobPolicy.php # Authorization policies
+├── Console/Commands/CleanupPendingJobs.php  # Automated cleanup command
+├── Events/JobProgressUpdated.php            # Real-time progress broadcasting
+├── Jobs/ProcessCsvToPdf.php                 # Background PDF generation
+├── Livewire/CsvToPdfProcessor.php           # Main UI component with user isolation
+├── Models/PdfGenerationJob.php              # Job tracking model with user relationships
+└── Policies/PdfGenerationJobPolicy.php     # Authorization policies
 
 resources/views/
 ├── livewire/csv-to-pdf-processor.blade.php  # Main interface with separate job sections
-└── pdf/credit-note-template.blade.php       # PDF template
+└── pdf/credit-note-template.blade.php       # PDF template (DomPDF compatible)
+
+routes/
+└── console.php                              # Scheduled tasks configuration
 
 storage/
 ├── app/temp-csv/          # Temporary CSV files
@@ -277,12 +292,14 @@ The application uses Laravel Reverb for real-time updates:
 - **Automatic Cleanup**: Removes individual PDFs after ZIP creation
 - **User Authorization**: All downloads verified through Laravel policies
 
-### Error Handling
+### Error Handling & Maintenance
 
 - **Robust Exception Handling**: Jobs always update status, even on failure
 - **Race Condition Prevention**: Database locking prevents concurrent batch completion
 - **Progress Synchronization**: Real-time updates stay in sync with database state
 - **Authorization Checks**: All user actions verified through policies before execution
+- **Automatic Cleanup**: Scheduled task removes stuck pending jobs every 30 minutes
+- **DomPDF Compatibility**: PDF templates use float-based layouts instead of modern CSS features
 
 ## Contributing
 

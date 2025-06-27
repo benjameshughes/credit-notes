@@ -6,7 +6,8 @@
       "Bash(php artisan install:broadcasting:*)",
       "Bash(composer:*)",
       "Bash(php artisan:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(git add:*)"
     ],
     "deny": []
   }

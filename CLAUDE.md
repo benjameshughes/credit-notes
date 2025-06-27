@@ -46,6 +46,15 @@ php artisan cache:clear
 php artisan view:clear
 ```
 
+### Maintenance Commands
+```bash
+# Clean up pending jobs older than 30 minutes (default)
+php artisan jobs:cleanup-pending
+
+# Clean up pending jobs older than specific hours
+php artisan jobs:cleanup-pending --hours=2
+```
+
 ### Frontend Build
 ```bash
 npm run build    # Production build
@@ -87,10 +96,13 @@ npm run dev      # Development server
 ### Key Features
 - File upload with validation (CSV, 10MB max)
 - Background job processing with progress tracking
+- Real-time updates via Laravel Reverb WebSockets
 - PDF generation from CSV data using Blade templates
 - ZIP file creation for batch downloads
 - Job history and status monitoring
 - User authentication and settings management
+- User isolation - users can only see/manage their own jobs
+- Automatic cleanup of old pending jobs (scheduled task)
 
 ### Storage Locations
 - Temp CSV files: `storage/app/temp-csv/`
