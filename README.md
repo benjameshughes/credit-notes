@@ -38,7 +38,7 @@ A Laravel 12 application for processing CSV files and generating credit note PDF
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/benhughes22/credit-notes.git
+   git clone https://github.com/benjameshughes/credit-notes.git
    cd credit-notes
    ```
 
@@ -262,4 +262,4 @@ This project is open-sourced software licensed under the [MIT license](LICENSE).
 
 ## Support
 
-For issues and questions, please use the [GitHub Issues](https://github.com/benhughes22/credit-notes/issues) page.
+For issues and questions, please use the [GitHub Issues](https://github.com/benjameshughes/credit-notes/issues) page.

@@ -24,7 +24,7 @@ This guide helps you deploy the Credit Notes Generator to Laravel Forge.
    - Web directory: `/public`
 
 2. **Connect GitHub repository:**
-   - Repository: `benhughes22/credit-notes`
+   - Repository: `benjameshughes/credit-notes`
    - Branch: `main`
    - Enable auto-deployment
 
