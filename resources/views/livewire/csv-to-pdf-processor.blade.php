@@ -282,13 +282,12 @@
         const setupRealTimeUpdates = () => {
             // Subscribe to updates for active batches
             @if(!empty($activeBatches))
-            @foreach($activeBatches as $batchId)
-            window.Echo.channel('batch.{{ $batchId }}')
-                .listen('.job.progress.updated', (e) => {
-                @this.call('updateJobProgress', '{{ $batchId }}', e)
-                    ;
-                });
-            @endforeach
+                @foreach($activeBatches as $batchId)
+                    window.Echo.channel('batch.{{ $batchId }}')
+                        .listen('.job.progress.updated', (e) => {
+                            @this.call('updateJobProgress', '{{ $batchId }}', e);
+                        });
+                @endforeach
             @endif
         };
 
@@ -302,7 +301,7 @@
             if (typeof window.Echo !== 'undefined') {
                 window.Echo.channel('batch.' + batchId)
                     .listen('.job.progress.updated', (e) => {
-                    @this.call('updateJobProgress', batchId, e);
+                        @this.call('updateJobProgress', batchId, e);
                     });
             }
         });
