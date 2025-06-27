@@ -269,41 +269,59 @@
 </div>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function () {
-        // Wait for Echo to be available
-        const waitForEcho = () => {
-            if (typeof window.Echo !== 'undefined') {
-                setupRealTimeUpdates();
-            } else {
-                setTimeout(waitForEcho, 100);
-            }
-        };
-
-        const setupRealTimeUpdates = () => {
-            // Subscribe to updates for active batches
-            @if(!empty($activeBatches))
-                @foreach($activeBatches as $batchId)
-                    window.Echo.channel('batch.{{ $batchId }}')
-                        .listen('.job.progress.updated', (e) => {
-                            @this.call('updateJobProgress', '{{ $batchId }}', e);
-                        });
-                @endforeach
-            @endif
-        };
-
-        // Start the Echo setup
-        waitForEcho();
-
-        // Listen for new batch creation to subscribe to new channels
-        Livewire.on('batchCreated', (event) => {
-            const batchId = Array.isArray(event) ? event[0] : event;
-
-            if (typeof window.Echo !== 'undefined') {
-                window.Echo.channel('batch.' + batchId)
+document.addEventListener('livewire:initialized', () => {
+    // Initialize Echo subscription manager
+    if (!window.echoManager) {
+        window.echoManager = {
+            channels: {},
+            
+            subscribe(batchId, componentId) {
+                if (this.channels[batchId]) return;
+                
+                this.channels[batchId] = window.Echo.channel(`batch.${batchId}`)
                     .listen('.job.progress.updated', (e) => {
-                        @this.call('updateJobProgress', batchId, e);
+                        const component = Livewire.find(componentId);
+                        if (component) {
+                            component.call('loadJobs');
+                        }
                     });
+            },
+            
+            unsubscribe(batchId) {
+                if (this.channels[batchId]) {
+                    window.Echo.leave(`batch.${batchId}`);
+                    delete this.channels[batchId];
+                }
+            },
+            
+            updateSubscriptions(activeBatches, componentId) {
+                // Subscribe to new batches
+                activeBatches.forEach(batchId => {
+                    this.subscribe(batchId, componentId);
+                });
+                
+                // Unsubscribe from completed batches
+                Object.keys(this.channels).forEach(batchId => {
+                    if (!activeBatches.includes(batchId)) {
+                        this.unsubscribe(batchId);
+                    }
+                });
             }
-        });
+        };
+    }
+    
+    // Get component reference
+    const component = @this;
+    
+    // Subscribe to initial active batches
+    const activeBatches = @json($activeBatches);
+    window.echoManager.updateSubscriptions(activeBatches, component.id);
+    
+    // Listen for batch updates
+    Livewire.on('batchesUpdated', (event) => {
+        const batches = event.detail?.batches || event.batches || [];
+        window.echoManager.updateSubscriptions(batches, component.id);
     });
+});
 </script>
+

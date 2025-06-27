@@ -33,12 +33,7 @@ class CsvToPdfProcessor extends Component
     public function mount()
     {
         $this->loadJobs();
-
-        // Track active batches for real-time updates (ensure strings for Livewire compatibility)
-        $this->activeBatches = collect($this->processingJobs)
-            ->pluck('batch_id')
-            ->map(fn ($id) => (string) $id)
-            ->toArray();
+        $this->updateActiveBatches();
     }
 
     public function uploadCsv()
@@ -85,12 +80,9 @@ class CsvToPdfProcessor extends Component
             $this->setMessage('success', 'CSV uploaded! Processing '.count($csvData).' records...');
             $this->reset('csvFile');
             $this->loadJobs();
-
-            // Add new batch to active batches for real-time updates (ensure string)
-            $this->activeBatches[] = $batchId;
-
-            // Emit event to frontend to subscribe to new batch
-            $this->dispatch('batchCreated', $batchId);
+            
+            // Update active batches for echo listeners
+            $this->updateActiveBatches();
 
         } catch (\Exception $e) {
             $this->setMessage('error', 'Upload failed: '.$e->getMessage());
@@ -185,30 +177,6 @@ class CsvToPdfProcessor extends Component
         $this->completedJobs = $allJobs->whereIn('status', ['completed', 'completed_with_errors'])->values()->toArray();
     }
 
-    public function updateJobProgress($batchId, $data)
-    {
-        // Find and update the specific job in processing jobs array
-        $jobIndex = collect($this->processingJobs)->search(function ($job) use ($batchId) {
-            return $job['batch_id'] === $batchId;
-        });
-
-        if ($jobIndex !== false) {
-            $this->processingJobs[$jobIndex] = array_merge($this->processingJobs[$jobIndex], $data);
-
-            // Move to completed jobs if finished
-            if (in_array($data['status'], ['completed', 'completed_with_errors'])) {
-                $completedJob = $this->processingJobs[$jobIndex];
-                array_unshift($this->completedJobs, $completedJob); // Add to beginning of completed
-                unset($this->processingJobs[$jobIndex]); // Remove from processing
-                $this->processingJobs = array_values($this->processingJobs); // Re-index array
-
-                // Remove from active batches
-                $this->activeBatches = array_filter($this->activeBatches, function ($id) use ($batchId) {
-                    return $id !== $batchId;
-                });
-            }
-        }
-    }
 
     private function setMessage($type, $text)
     {
@@ -221,6 +189,20 @@ class CsvToPdfProcessor extends Component
         $this->message = '';
         $this->messageType = '';
     }
+    
+    private function updateActiveBatches()
+    {
+        // Track active batches for real-time updates
+        $this->activeBatches = collect($this->processingJobs)
+            ->pluck('batch_id')
+            ->unique()
+            ->values()
+            ->toArray();
+            
+        // Dispatch event to update JavaScript subscriptions
+        $this->dispatch('batchesUpdated', batches: $this->activeBatches);
+    }
+    
 
     public function deleteJob($batchId)
     {
@@ -258,6 +240,7 @@ class CsvToPdfProcessor extends Component
             $this->setMessage('error', 'Failed to delete job: '.$e->getMessage());
         }
     }
+
 
     public function render()
     {

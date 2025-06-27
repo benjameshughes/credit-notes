@@ -52,16 +52,12 @@ class ProcessCsvToPdf implements ShouldQueue
                     'status' => 'completed',
                     'file_paths' => json_encode([$pdfPath]),
                 ]);
-
-                \Log::info("PDF generated successfully for job {$this->jobId}");
             } else {
                 $job->update([
                     'processed_rows' => 0,
                     'failed_rows' => 1,
                     'status' => 'failed',
                 ]);
-
-                \Log::warning("PDF generation returned null for job {$this->jobId}");
             }
 
         } catch (\Exception $e) {
@@ -131,7 +127,6 @@ class ProcessCsvToPdf implements ShouldQueue
             $failedJobs = $jobs->where('status', 'failed');
             $processingJobs = $jobs->where('status', 'processing');
 
-            \Log::info("Batch {$batchId} status check: total={$jobs->count()}, completed={$completedJobs->count()}, failed={$failedJobs->count()}, processing={$processingJobs->count()}");
 
             // If all jobs are either completed or failed (none processing)
             if (($completedJobs->count() + $failedJobs->count()) === $jobs->count() && $processingJobs->count() === 0) {
@@ -158,8 +153,6 @@ class ProcessCsvToPdf implements ShouldQueue
                                 $job->update(['zip_path' => $zipPath]);
                             });
 
-                            \Log::info("Created ZIP file for batch {$batchId}: {$zipPath}");
-
                             // Clean up individual PDF files after zipping
                             $this->cleanup($pdfPaths);
                         } else {
@@ -170,15 +163,11 @@ class ProcessCsvToPdf implements ShouldQueue
                             $completedJobs->each(function ($job) use ($singlePdfPath) {
                                 $job->update(['single_pdf_path' => $singlePdfPath]);
                             });
-
-                            \Log::info("Single PDF kept for batch {$batchId}: {$singlePdfPath}");
                         }
 
                         // Broadcast final completion status
                         $this->broadcastBatchProgress($batchId);
                     }
-                } else {
-                    \Log::info("Batch {$batchId} already processed, skipping completion");
                 }
             }
         });

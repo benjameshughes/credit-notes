@@ -5,10 +5,11 @@ namespace App\Events;
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
+use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-class JobProgressUpdated implements ShouldBroadcast
+class JobProgressUpdated implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
@@ -61,9 +62,6 @@ class JobProgressUpdated implements ShouldBroadcast
             'download_available' => $this->zipPath || $this->singlePdfPath,
             'is_single_pdf' => ! $this->zipPath && $this->singlePdfPath,
         ];
-
-        // Log broadcasting for debugging
-        \Log::info("Broadcasting progress update for batch {$this->batchId}", $data);
 
         return $data;
     }
