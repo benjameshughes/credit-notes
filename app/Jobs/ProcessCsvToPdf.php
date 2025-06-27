@@ -1,5 +1,7 @@
 <?php
+
 // app/Jobs/ProcessCsvToPdf.php
+
 namespace App\Jobs;
 
 use App\Events\JobProgressUpdated;
@@ -30,13 +32,13 @@ class ProcessCsvToPdf implements ShouldQueue
     {
         $job = PdfGenerationJob::find($this->jobId);
 
-        if (!$job) {
+        if (! $job) {
             return;
         }
 
         try {
             $job->update(['status' => 'processing']);
-            
+
             // Broadcast processing status
             $this->broadcastBatchProgress($job->batch_id);
 
@@ -48,17 +50,17 @@ class ProcessCsvToPdf implements ShouldQueue
                     'processed_rows' => 1,
                     'failed_rows' => 0,
                     'status' => 'completed',
-                    'file_paths' => json_encode([$pdfPath])
+                    'file_paths' => json_encode([$pdfPath]),
                 ]);
-                
+
                 \Log::info("PDF generated successfully for job {$this->jobId}");
             } else {
                 $job->update([
                     'processed_rows' => 0,
                     'failed_rows' => 1,
-                    'status' => 'failed'
+                    'status' => 'failed',
                 ]);
-                
+
                 \Log::warning("PDF generation returned null for job {$this->jobId}");
             }
 
@@ -68,20 +70,20 @@ class ProcessCsvToPdf implements ShouldQueue
                 $job->update([
                     'processed_rows' => 0,
                     'failed_rows' => 1,
-                    'status' => 'failed'
+                    'status' => 'failed',
                 ]);
             } catch (\Exception $updateException) {
-                \Log::error("Failed to update job status after exception: " . $updateException->getMessage());
+                \Log::error('Failed to update job status after exception: '.$updateException->getMessage());
             }
-            
-            \Log::error("PDF generation failed for job {$this->jobId}: " . $e->getMessage());
+
+            \Log::error("PDF generation failed for job {$this->jobId}: ".$e->getMessage());
         } finally {
             // Always broadcast progress and check batch completion
             try {
                 $this->broadcastBatchProgress($job->batch_id);
                 $this->checkBatchCompletion($job->batch_id);
             } catch (\Exception $e) {
-                \Log::error("Error in finally block for job {$this->jobId}: " . $e->getMessage());
+                \Log::error("Error in finally block for job {$this->jobId}: ".$e->getMessage());
             }
         }
     }
@@ -97,21 +99,22 @@ class ProcessCsvToPdf implements ShouldQueue
 
             // Create filename using credit note number or fallback
             $filename = 'credit_note_';
-            if (!empty($data['Number'])) {
+            if (! empty($data['Number'])) {
                 $filename .= \Str::slug($data['Number']);
             } else {
                 $filename .= ($index + 1);
             }
             $filename .= '.pdf';
 
-            $path = 'pdfs/' . $batchId . '/' . $filename;
+            $path = 'pdfs/'.$batchId.'/'.$filename;
 
             Storage::put($path, $pdf->output());
 
             return $path;
 
         } catch (\Exception $e) {
-            \Log::error("PDF generation error: " . $e->getMessage());
+            \Log::error('PDF generation error: '.$e->getMessage());
+
             return null;
         }
     }
@@ -123,54 +126,54 @@ class ProcessCsvToPdf implements ShouldQueue
             $jobs = PdfGenerationJob::where('batch_id', $batchId)
                 ->lockForUpdate()
                 ->get();
-                
+
             $completedJobs = $jobs->where('status', 'completed');
             $failedJobs = $jobs->where('status', 'failed');
             $processingJobs = $jobs->where('status', 'processing');
-            
+
             \Log::info("Batch {$batchId} status check: total={$jobs->count()}, completed={$completedJobs->count()}, failed={$failedJobs->count()}, processing={$processingJobs->count()}");
-            
+
             // If all jobs are either completed or failed (none processing)
             if (($completedJobs->count() + $failedJobs->count()) === $jobs->count() && $processingJobs->count() === 0) {
                 // Check if we've already processed this batch
                 $alreadyProcessed = $jobs->whereNotNull('zip_path')->count() > 0 || $jobs->whereNotNull('single_pdf_path')->count() > 0;
-                
-                if (!$alreadyProcessed) {
+
+                if (! $alreadyProcessed) {
                     $pdfPaths = [];
-                    
+
                     foreach ($completedJobs as $job) {
                         $filePaths = json_decode($job->file_paths, true);
                         if ($filePaths) {
                             $pdfPaths = array_merge($pdfPaths, $filePaths);
                         }
                     }
-                    
-                    if (!empty($pdfPaths)) {
+
+                    if (! empty($pdfPaths)) {
                         if (count($pdfPaths) > 1) {
                             // Multiple PDFs - create ZIP file
                             $zipPath = $this->createZipFile($pdfPaths, $jobs->first()->original_filename);
-                            
+
                             // Update all completed jobs with the zip path
                             $completedJobs->each(function ($job) use ($zipPath) {
                                 $job->update(['zip_path' => $zipPath]);
                             });
-                            
+
                             \Log::info("Created ZIP file for batch {$batchId}: {$zipPath}");
-                            
+
                             // Clean up individual PDF files after zipping
                             $this->cleanup($pdfPaths);
                         } else {
                             // Single PDF - keep the individual PDF file
                             $singlePdfPath = $pdfPaths[0];
-                            
+
                             // Update the job with the single PDF path (no zip_path)
                             $completedJobs->each(function ($job) use ($singlePdfPath) {
                                 $job->update(['single_pdf_path' => $singlePdfPath]);
                             });
-                            
+
                             \Log::info("Single PDF kept for batch {$batchId}: {$singlePdfPath}");
                         }
-                        
+
                         // Broadcast final completion status
                         $this->broadcastBatchProgress($batchId);
                     }
@@ -207,19 +210,19 @@ class ProcessCsvToPdf implements ShouldQueue
 
     private function createZipFile($pdfPaths, $originalFilename)
     {
-        $zipFilename = 'pdfs_' . \Str::slug(pathinfo($originalFilename, PATHINFO_FILENAME)) . '_' . date('Y-m-d_H-i-s') . '.zip';
-        $zipPath = 'downloads/' . $zipFilename;
-        $fullZipPath = storage_path('app/' . $zipPath);
+        $zipFilename = 'pdfs_'.\Str::slug(pathinfo($originalFilename, PATHINFO_FILENAME)).'_'.date('Y-m-d_H-i-s').'.zip';
+        $zipPath = 'downloads/'.$zipFilename;
+        $fullZipPath = storage_path('app/'.$zipPath);
 
         // Ensure directory exists
         $dir = dirname($fullZipPath);
-        if (!is_dir($dir)) {
+        if (! is_dir($dir)) {
             mkdir($dir, 0755, true);
         }
 
-        $zip = new ZipArchive();
+        $zip = new ZipArchive;
 
-        if ($zip->open($fullZipPath, ZipArchive::CREATE) === TRUE) {
+        if ($zip->open($fullZipPath, ZipArchive::CREATE) === true) {
             foreach ($pdfPaths as $pdfPath) {
                 $fullPdfPath = Storage::path($pdfPath);
                 if (file_exists($fullPdfPath)) {

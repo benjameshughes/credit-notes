@@ -4,7 +4,6 @@ namespace App\Livewire;
 
 use App\Jobs\ProcessCsvToPdf;
 use App\Models\PdfGenerationJob;
-use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Str;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -14,25 +13,31 @@ class CsvToPdfProcessor extends Component
     use WithFileUploads;
 
     public $csvFile;
-    public $jobs = [];
+
+    public $processingJobs = [];
+
+    public $completedJobs = [];
+
     public $isProcessing = false;
+
     public $message = '';
+
     public $messageType = '';
+
     public $activeBatches = []; // Track active batch IDs for real-time updates
 
     protected $rules = [
-        'csvFile' => 'required|file|mimes:csv,txt|max:10240'
+        'csvFile' => 'required|file|mimes:csv,txt|max:10240',
     ];
 
     public function mount()
     {
         $this->loadJobs();
-        
-        // Track active batches for real-time updates
-        $this->activeBatches = collect($this->jobs)
-            ->where('status', '!=', 'completed')
-            ->where('status', '!=', 'completed_with_errors')
+
+        // Track active batches for real-time updates (ensure strings for Livewire compatibility)
+        $this->activeBatches = collect($this->processingJobs)
             ->pluck('batch_id')
+            ->map(fn ($id) => (string) $id)
             ->toArray();
     }
 
@@ -55,9 +60,9 @@ class CsvToPdfProcessor extends Component
             }
 
             // Create individual job records for each CSV row
-            $batchId = Str::uuid();
+            $batchId = (string) Str::uuid(); // Convert to string for Livewire compatibility
             $jobIds = [];
-            
+
             foreach ($csvData as $index => $rowData) {
                 $job = PdfGenerationJob::create([
                     'batch_id' => $batchId,
@@ -67,27 +72,28 @@ class CsvToPdfProcessor extends Component
                     'failed_rows' => 0,
                     'status' => 'pending',
                     'row_data' => json_encode($rowData), // Store the row data
-                    'row_index' => $index
+                    'row_index' => $index,
+                    'user_id' => auth()->id(),
                 ]);
-                
+
                 $jobIds[] = $job->id;
-                
+
                 // Dispatch individual processing job
                 ProcessCsvToPdf::dispatch($job->id, $rowData, $index);
             }
 
-            $this->setMessage('success', 'CSV uploaded! Processing ' . count($csvData) . ' records...');
+            $this->setMessage('success', 'CSV uploaded! Processing '.count($csvData).' records...');
             $this->reset('csvFile');
             $this->loadJobs();
-            
-            // Add new batch to active batches for real-time updates
+
+            // Add new batch to active batches for real-time updates (ensure string)
             $this->activeBatches[] = $batchId;
-            
+
             // Emit event to frontend to subscribe to new batch
             $this->dispatch('batchCreated', $batchId);
 
         } catch (\Exception $e) {
-            $this->setMessage('error', 'Upload failed: ' . $e->getMessage());
+            $this->setMessage('error', 'Upload failed: '.$e->getMessage());
         } finally {
             $this->isProcessing = false;
         }
@@ -96,18 +102,18 @@ class CsvToPdfProcessor extends Component
     private function parseCsv($filePath)
     {
         $data = [];
-        
-        if (!file_exists($filePath)) {
+
+        if (! file_exists($filePath)) {
             throw new \Exception('File not found');
         }
 
         $handle = fopen($filePath, 'r');
-        if (!$handle) {
+        if (! $handle) {
             throw new \Exception('Cannot read file');
         }
 
         $headers = fgetcsv($handle);
-        if (!$headers) {
+        if (! $headers) {
             fclose($handle);
             throw new \Exception('Invalid CSV format');
         }
@@ -119,13 +125,15 @@ class CsvToPdfProcessor extends Component
         }
 
         fclose($handle);
+
         return $data;
     }
 
     public function loadJobs()
     {
-        // Group jobs by batch_id and calculate batch-level progress
-        $batches = PdfGenerationJob::select('batch_id', 'original_filename')
+        // Group jobs by batch_id and calculate batch-level progress - only for current user
+        $batches = PdfGenerationJob::where('user_id', auth()->id())
+            ->select('batch_id', 'original_filename')
             ->selectRaw('MIN(created_at) as created_at')
             ->selectRaw('COUNT(*) as total_rows')
             ->selectRaw('SUM(CASE WHEN status = "completed" THEN 1 ELSE 0 END) as completed_rows')
@@ -135,15 +143,15 @@ class CsvToPdfProcessor extends Component
             ->selectRaw('MAX(single_pdf_path) as single_pdf_path')
             ->groupBy('batch_id', 'original_filename')
             ->orderBy('created_at', 'desc')
-            ->take(10)
+            ->take(20)
             ->get();
 
-        $this->jobs = $batches->map(function ($batch) {
+        $allJobs = $batches->map(function ($batch) {
             $completedCount = $batch->completed_rows;
             $failedCount = $batch->failed_rows;
             $processingCount = $batch->processing_rows;
             $totalCount = $batch->total_rows;
-            
+
             // Determine overall batch status
             if ($completedCount + $failedCount === $totalCount) {
                 $status = $failedCount > 0 ? 'completed_with_errors' : 'completed';
@@ -152,9 +160,9 @@ class CsvToPdfProcessor extends Component
             } else {
                 $status = 'pending';
             }
-            
+
             $progress = $totalCount > 0 ? round((($completedCount + $failedCount) / $totalCount) * 100, 1) : 0;
-            
+
             return [
                 'batch_id' => $batch->batch_id,
                 'filename' => $batch->original_filename,
@@ -167,25 +175,35 @@ class CsvToPdfProcessor extends Component
                 'zip_path' => $batch->zip_path,
                 'single_pdf_path' => $batch->single_pdf_path,
                 'download_available' => $batch->zip_path || $batch->single_pdf_path,
-                'is_single_pdf' => !$batch->zip_path && $batch->single_pdf_path,
-                'created_at' => $batch->created_at->format('M j, Y g:i A')
+                'is_single_pdf' => ! $batch->zip_path && $batch->single_pdf_path,
+                'created_at' => $batch->created_at->format('M j, Y g:i A'),
             ];
-        })->toArray();
+        });
+
+        // Separate processing and completed jobs
+        $this->processingJobs = $allJobs->whereIn('status', ['pending', 'processing'])->values()->toArray();
+        $this->completedJobs = $allJobs->whereIn('status', ['completed', 'completed_with_errors'])->values()->toArray();
     }
 
     public function updateJobProgress($batchId, $data)
     {
-        // Find and update the specific job in the jobs array
-        $jobIndex = collect($this->jobs)->search(function ($job) use ($batchId) {
+        // Find and update the specific job in processing jobs array
+        $jobIndex = collect($this->processingJobs)->search(function ($job) use ($batchId) {
             return $job['batch_id'] === $batchId;
         });
 
         if ($jobIndex !== false) {
-            $this->jobs[$jobIndex] = array_merge($this->jobs[$jobIndex], $data);
-            
-            // Remove from active batches if completed
+            $this->processingJobs[$jobIndex] = array_merge($this->processingJobs[$jobIndex], $data);
+
+            // Move to completed jobs if finished
             if (in_array($data['status'], ['completed', 'completed_with_errors'])) {
-                $this->activeBatches = array_filter($this->activeBatches, function($id) use ($batchId) {
+                $completedJob = $this->processingJobs[$jobIndex];
+                array_unshift($this->completedJobs, $completedJob); // Add to beginning of completed
+                unset($this->processingJobs[$jobIndex]); // Remove from processing
+                $this->processingJobs = array_values($this->processingJobs); // Re-index array
+
+                // Remove from active batches
+                $this->activeBatches = array_filter($this->activeBatches, function ($id) use ($batchId) {
                     return $id !== $batchId;
                 });
             }
@@ -202,6 +220,43 @@ class CsvToPdfProcessor extends Component
     {
         $this->message = '';
         $this->messageType = '';
+    }
+
+    public function deleteJob($batchId)
+    {
+        try {
+            // Get all jobs in the batch for the current user
+            $jobs = PdfGenerationJob::where('batch_id', $batchId)
+                ->where('user_id', auth()->id())
+                ->get();
+
+            if ($jobs->isEmpty()) {
+                $this->setMessage('error', 'Job not found or you do not have permission to delete it.');
+
+                return;
+            }
+
+            // Check authorization for deletion using policy
+            $firstJob = $jobs->first();
+            if (! auth()->user()->can('delete', $firstJob)) {
+                $this->setMessage('error', 'Cannot delete job while it is still processing.');
+
+                return;
+            }
+
+            // Delete all jobs in the batch (this will also delete associated files)
+            foreach ($jobs as $job) {
+                if (auth()->user()->can('delete', $job)) {
+                    $job->delete();
+                }
+            }
+
+            $this->setMessage('success', 'Job and associated files deleted successfully.');
+            $this->loadJobs();
+
+        } catch (\Exception $e) {
+            $this->setMessage('error', 'Failed to delete job: '.$e->getMessage());
+        }
     }
 
     public function render()

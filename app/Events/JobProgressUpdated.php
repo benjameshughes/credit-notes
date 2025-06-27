@@ -26,7 +26,7 @@ class JobProgressUpdated implements ShouldBroadcast
     public function broadcastOn(): array
     {
         return [
-            new Channel('batch.' . $this->batchId),
+            new Channel('batch.'.$this->batchId),
         ];
     }
 
@@ -38,7 +38,7 @@ class JobProgressUpdated implements ShouldBroadcast
     public function broadcastWith(): array
     {
         $progress = $this->totalRows > 0 ? round((($this->completedRows + $this->failedRows) / $this->totalRows) * 100, 1) : 0;
-        
+
         // Determine overall batch status
         if ($this->completedRows + $this->failedRows === $this->totalRows) {
             $overallStatus = $this->failedRows > 0 ? 'completed_with_errors' : 'completed';
@@ -48,7 +48,7 @@ class JobProgressUpdated implements ShouldBroadcast
             $overallStatus = 'pending';
         }
 
-        return [
+        $data = [
             'batch_id' => $this->batchId,
             'status' => $overallStatus,
             'total_rows' => $this->totalRows,
@@ -59,7 +59,12 @@ class JobProgressUpdated implements ShouldBroadcast
             'zip_path' => $this->zipPath,
             'single_pdf_path' => $this->singlePdfPath,
             'download_available' => $this->zipPath || $this->singlePdfPath,
-            'is_single_pdf' => !$this->zipPath && $this->singlePdfPath,
+            'is_single_pdf' => ! $this->zipPath && $this->singlePdfPath,
         ];
+
+        // Log broadcasting for debugging
+        \Log::info("Broadcasting progress update for batch {$this->batchId}", $data);
+
+        return $data;
     }
 }

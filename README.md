@@ -9,7 +9,10 @@ A Laravel 12 application for processing CSV files and generating credit note PDF
 - 📦 **Smart Downloads**: Automatically creates ZIP files for multiple PDFs or serves single PDFs directly
 - 🎨 **Modern UI**: Dark mode interface using Tailwind CSS and Flux UI components
 - 🔐 **User Authentication**: Secure access with Laravel's built-in authentication
-- 📊 **Progress Tracking**: Visual progress bars and status indicators
+- 👤 **User Isolation**: Each user can only see and manage their own jobs and files
+- 🗑️ **Job Management**: Delete completed jobs and their associated files
+- 📊 **Organized Interface**: Separate sections for active/processing and completed jobs
+- 🛡️ **Laravel Policies**: Proper authorization using Laravel's policy system
 - 💾 **Background Processing**: Queue-based processing for handling large CSV files
 - 🏢 **Professional Templates**: Company-branded PDF templates with VAT compliance
 
@@ -142,9 +145,10 @@ php artisan view:clear
 
 ### Architecture
 
-- **`CsvToPdfProcessor`** - Main Livewire component handling uploads and UI
+- **`CsvToPdfProcessor`** - Main Livewire component handling uploads and UI with separated processing/completed job views
 - **`ProcessCsvToPdf`** - Queue job for individual PDF generation
-- **`PdfGenerationJob`** - Eloquent model tracking job progress
+- **`PdfGenerationJob`** - Eloquent model tracking job progress with user relationships and file cleanup
+- **`PdfGenerationJobPolicy`** - Laravel policy for user authorization and job management permissions
 - **`JobProgressUpdated`** - Broadcast event for real-time updates
 - **Credit Note Template** - Blade template for PDF generation
 
@@ -154,16 +158,17 @@ php artisan view:clear
 app/
 ├── Events/JobProgressUpdated.php      # Real-time progress broadcasting
 ├── Jobs/ProcessCsvToPdf.php           # Background PDF generation
-├── Livewire/CsvToPdfProcessor.php     # Main UI component
-└── Models/PdfGenerationJob.php        # Job tracking model
+├── Livewire/CsvToPdfProcessor.php     # Main UI component with user isolation
+├── Models/PdfGenerationJob.php        # Job tracking model with user relationships
+└── Policies/PdfGenerationJobPolicy.php # Authorization policies
 
 resources/views/
-├── livewire/csv-to-pdf-processor.blade.php  # Main interface
+├── livewire/csv-to-pdf-processor.blade.php  # Main interface with separate job sections
 └── pdf/credit-note-template.blade.php       # PDF template
 
 storage/
 ├── app/temp-csv/          # Temporary CSV files
-├── app/pdfs/{batch_id}/   # Generated PDF files
+├── app/pdfs/{batch_id}/   # Generated PDF files (auto-cleaned on job deletion)
 └── app/downloads/         # ZIP downloads
 ```
 
@@ -228,6 +233,34 @@ See `deploy.sh` for the complete deployment script.
 
 ## Features in Detail
 
+### User Management & Security
+
+The application provides complete user isolation and management:
+
+- **User-Specific Jobs**: Each user can only see and manage their own PDF generation jobs
+- **Laravel Policies**: Authorization handled through `PdfGenerationJobPolicy` with methods for:
+  - `view()` - Users can only view their own jobs
+  - `delete()` - Users can only delete their own completed jobs
+  - `download()` - Users can only download their own completed files
+- **Secure Downloads**: All download routes check user ownership before serving files
+- **Job Deletion**: Delete completed jobs along with all associated PDF and ZIP files
+- **Automatic Cleanup**: When jobs are deleted, all related files are automatically removed from storage
+
+### Interface Organization
+
+The main interface is organized into two distinct sections:
+
+- **Active Jobs Section**: Shows currently pending and processing jobs with:
+  - Real-time progress updates
+  - Animated progress bars
+  - Live status indicators
+  - Job count in section header
+- **Completed Jobs Section**: Shows finished jobs with:
+  - Download buttons for available files
+  - Delete buttons for job cleanup
+  - Final completion status
+  - Error indicators if applicable
+
 ### Real-time Progress Tracking
 
 The application uses Laravel Reverb for real-time updates:
@@ -235,18 +268,21 @@ The application uses Laravel Reverb for real-time updates:
 - **Server-side**: Jobs broadcast progress events via `JobProgressUpdated`
 - **Client-side**: Laravel Echo listens for WebSocket events and updates UI
 - **Channels**: Each batch has its own channel (`batch.{batchId}`)
+- **Live Job Movement**: Jobs automatically move from active to completed section when finished
 
 ### Smart Download Logic
 
 - **Single PDF**: Downloads individual PDF file directly
 - **Multiple PDFs**: Creates ZIP archive with all PDFs
 - **Automatic Cleanup**: Removes individual PDFs after ZIP creation
+- **User Authorization**: All downloads verified through Laravel policies
 
 ### Error Handling
 
 - **Robust Exception Handling**: Jobs always update status, even on failure
 - **Race Condition Prevention**: Database locking prevents concurrent batch completion
 - **Progress Synchronization**: Real-time updates stay in sync with database state
+- **Authorization Checks**: All user actions verified through policies before execution
 
 ## Contributing
 
