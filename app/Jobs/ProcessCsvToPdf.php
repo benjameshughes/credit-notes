@@ -125,10 +125,9 @@ class ProcessCsvToPdf implements ShouldQueue
 
             $completedJobs = $jobs->where('status', 'completed');
             $failedJobs = $jobs->where('status', 'failed');
-            $processingJobs = $jobs->where('status', 'processing');
+            $processingJobs = $jobs->whereIn('status', ['processing', 'pending']);
 
-
-            // If all jobs are either completed or failed (none processing)
+            // If all jobs are either completed or failed (none processing or pending)
             if (($completedJobs->count() + $failedJobs->count()) === $jobs->count() && $processingJobs->count() === 0) {
                 // Check if we've already processed this batch
                 $alreadyProcessed = $jobs->whereNotNull('zip_path')->count() > 0 || $jobs->whereNotNull('single_pdf_path')->count() > 0;
@@ -148,10 +147,9 @@ class ProcessCsvToPdf implements ShouldQueue
                             // Multiple PDFs - create ZIP file
                             $zipPath = $this->createZipFile($pdfPaths, $jobs->first()->original_filename);
 
-                            // Update all completed jobs with the zip path
-                            $completedJobs->each(function ($job) use ($zipPath) {
-                                $job->update(['zip_path' => $zipPath]);
-                            });
+                            // Update all jobs in batch with the zip path
+                            PdfGenerationJob::where('batch_id', $batchId)
+                                ->update(['zip_path' => $zipPath]);
 
                             // Clean up individual PDF files after zipping
                             $this->cleanup($pdfPaths);
@@ -159,10 +157,9 @@ class ProcessCsvToPdf implements ShouldQueue
                             // Single PDF - keep the individual PDF file
                             $singlePdfPath = $pdfPaths[0];
 
-                            // Update the job with the single PDF path (no zip_path)
-                            $completedJobs->each(function ($job) use ($singlePdfPath) {
-                                $job->update(['single_pdf_path' => $singlePdfPath]);
-                            });
+                            // Update all jobs in batch with the single PDF path
+                            PdfGenerationJob::where('batch_id', $batchId)
+                                ->update(['single_pdf_path' => $singlePdfPath]);
                         }
 
                         // Broadcast final completion status
