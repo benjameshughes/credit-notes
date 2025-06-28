@@ -13,7 +13,9 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use ZipArchive;
 
 class ProcessCsvToPdf implements ShouldQueue
@@ -69,17 +71,17 @@ class ProcessCsvToPdf implements ShouldQueue
                     'status' => 'failed',
                 ]);
             } catch (\Exception $updateException) {
-                \Log::error('Failed to update job status after exception: '.$updateException->getMessage());
+                Log::error('Failed to update job status after exception: '.$updateException->getMessage());
             }
 
-            \Log::error("PDF generation failed for job {$this->jobId}: ".$e->getMessage());
+            Log::error("PDF generation failed for job {$this->jobId}: ".$e->getMessage());
         } finally {
             // Always broadcast progress and check batch completion
             try {
                 $this->broadcastBatchProgress($job->batch_id);
                 $this->checkBatchCompletion($job->batch_id);
             } catch (\Exception $e) {
-                \Log::error("Error in finally block for job {$this->jobId}: ".$e->getMessage());
+                Log::error("Error in finally block for job {$this->jobId}: ".$e->getMessage());
             }
         }
     }
@@ -96,7 +98,7 @@ class ProcessCsvToPdf implements ShouldQueue
             // Create filename using credit note number or fallback
             $filename = 'credit_note_';
             if (! empty($data['Number'])) {
-                $filename .= \Str::slug($data['Number']);
+                $filename .= Str::slug($data['Number']);
             } else {
                 $filename .= ($index + 1);
             }
@@ -109,7 +111,7 @@ class ProcessCsvToPdf implements ShouldQueue
             return $path;
 
         } catch (\Exception $e) {
-            \Log::error('PDF generation error: '.$e->getMessage());
+            Log::error('PDF generation error: '.$e->getMessage());
 
             return null;
         }
@@ -196,7 +198,7 @@ class ProcessCsvToPdf implements ShouldQueue
 
     private function createZipFile($pdfPaths, $originalFilename)
     {
-        $zipFilename = 'pdfs_'.\Str::slug(pathinfo($originalFilename, PATHINFO_FILENAME)).'_'.date('Y-m-d_H-i-s').'.zip';
+        $zipFilename = 'pdfs_'. Str::slug(pathinfo($originalFilename, PATHINFO_FILENAME)).'_'.date('Y-m-d_H-i-s').'.zip';
         $zipPath = 'downloads/'.$zipFilename;
         $fullZipPath = storage_path('app/'.$zipPath);
 
