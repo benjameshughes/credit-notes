@@ -16,7 +16,6 @@ composer dev
 # Individual services
 php artisan serve                    # Start Laravel server
 php artisan queue:listen --tries=1   # Process background jobs
-php artisan reverb:start             # Start WebSocket server
 php artisan pail                     # View logs
 npm run dev                          # Start Vite development server
 ```
@@ -69,14 +68,13 @@ npm run dev      # Development server
 2. **Job Creation**: Creates individual `PdfGenerationJob` records per CSV row
 3. **Queue Processing**: `ProcessCsvToPdf` jobs dispatched with 1-hour timeout
 4. **PDF Generation**: Spatie Laravel PDF renders Blade templates using Chromium (supports modern CSS)
-5. **Progress Broadcasting**: Real-time updates via `JobProgressUpdated` event
+5. **Progress Updates**: Real-time updates via Livewire polling
 6. **File Management**: Smart download logic - single PDF or ZIP for multiple files
 7. **Cleanup**: Automatic file deletion when jobs are deleted
 
 ### Core Technologies
 - **Laravel 12** with **Livewire 3** for reactive UI components
 - **Livewire Flux** for modern UI components
-- **Laravel Reverb** for WebSocket server (first-party solution)
 - **SQLite** database (file-based at `database/database.sqlite`)
 - **Queue system** using database driver
 - **Spatie Laravel PDF** for PDF generation (full modern CSS support via Chromium)
@@ -87,7 +85,6 @@ npm run dev      # Development server
 - `app/Livewire/CsvToPdfProcessor.php` - Main UI component with user isolation
 - `app/Jobs/ProcessCsvToPdf.php` - Background job with race condition prevention
 - `app/Models/PdfGenerationJob.php` - Job tracking with user relationships
-- `app/Events/JobProgressUpdated.php` - Broadcasting with `ShouldBroadcastNow`
 - `app/Policies/PdfGenerationJobPolicy.php` - User authorization for all actions
 - `app/Console/Commands/CleanupPendingJobs.php` - Scheduled maintenance
 - `resources/views/pdf/credit-note-template.blade.php` - PDF template
@@ -101,12 +98,10 @@ npm run dev      # Development server
   - `file_paths` (JSON), `zip_path`
   - Indexes on `user_id`, `batch_id`, `status`
 
-### WebSocket/Broadcasting Architecture
-- **Event**: `JobProgressUpdated` implements `ShouldBroadcastNow`
-- **Channel Pattern**: `batch.{batchId}` for job-specific updates
-- **Client Integration**: Laravel Echo with Pusher JS driver
-- **Connection Management**: Automatic channel subscription/unsubscription
-- **Configuration**: Uses Laravel Reverb (not Pusher)
+### Progress Updates Architecture
+- **Polling**: Livewire wire:poll for real-time UI updates
+- **Frequency**: 100ms polling interval for responsive updates
+- **Client Side**: No WebSocket dependencies required
 
 ### Queue Processing Details
 - **Driver**: Database queue (configurable to Redis)
@@ -138,24 +133,15 @@ npm run dev      # Development server
 ### Production Deployment Considerations
 1. **Environment Variables**:
    ```env
-   BROADCAST_CONNECTION=reverb    # Not pusher!
+   BROADCAST_CONNECTION=null      # No broadcasting
    QUEUE_CONNECTION=database      # Or redis
-   REVERB_HOST=yourdomain.com     # Not localhost
-   REVERB_PORT=443                # For WSS
-   REVERB_SCHEME=https            # For production
    ```
 
 2. **Required Daemons** (Forge/Supervisor):
    - `php artisan queue:work` - Queue processing
-   - `php artisan reverb:start` - WebSocket server
    - `php artisan schedule:work` - For cleanup tasks
 
-3. **WebSocket Configuration**:
-   - Nginx proxy configuration required for WebSocket
-   - SSL certificate must cover domain
-   - Firewall must allow WebSocket port
-
-4. **Known Limitations**:
+3. **Known Limitations**:
    - Requires Node.js and Chromium for PDF generation
    - Large CSV files may need memory_limit adjustments
-   - WebSocket connections need proper proxy setup
+   - Polling updates may create additional server load with many concurrent users

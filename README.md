@@ -5,7 +5,7 @@ A Laravel 12 application for processing CSV files and generating credit note PDF
 ## Features
 
 - 🔄 **CSV to PDF Processing**: Upload CSV files and automatically generate individual credit note PDFs
-- ⚡ **Real-time Updates**: Live progress tracking using Laravel Reverb WebSockets
+- ⚡ **Real-time Updates**: Live progress tracking using Livewire polling
 - 📦 **Smart Downloads**: Automatically creates ZIP files for multiple PDFs or serves single PDFs directly
 - 🎨 **Modern UI**: Dark mode interface using Tailwind CSS and Flux UI components
 - 🔐 **User Authentication**: Secure access with Laravel's built-in authentication
@@ -20,8 +20,6 @@ A Laravel 12 application for processing CSV files and generating credit note PDF
 
 - **Laravel 12** - Backend framework
 - **Livewire 3** - Reactive frontend components
-- **Laravel Reverb** - Real-time WebSocket server (first-party)
-- **Laravel Echo** - Frontend WebSocket client
 - **Spatie Laravel PDF** - PDF generation using Chromium/Browsershot
 - **Tailwind CSS 4** - Utility-first CSS framework
 - **Flux UI** - Modern UI components for Livewire
@@ -81,7 +79,6 @@ composer dev
 This starts:
 - Laravel development server (`php artisan serve`)
 - Queue worker (`php artisan queue:listen`)
-- Laravel Reverb WebSocket server (`php artisan reverb:start`)
 - Log viewer (`php artisan pail`)
 - Vite development server (`npm run dev`)
 
@@ -94,8 +91,6 @@ php artisan serve
 # Process background jobs
 php artisan queue:listen
 
-# Start WebSocket server for real-time updates
-php artisan reverb:start
 
 # View application logs
 php artisan pail
@@ -147,7 +142,7 @@ php artisan jobs:cleanup-pending --hours=2
 1. **Upload**: User uploads CSV file via Livewire component
 2. **Job Creation**: System creates individual `PdfGenerationJob` records for each CSV row
 3. **Queue Processing**: Background jobs process each row and generate PDFs
-4. **Real-time Updates**: Progress broadcasted via Laravel Reverb WebSockets
+4. **Real-time Updates**: Progress updates via Livewire polling
 5. **File Management**: 
    - Single PDF: Served directly for download
    - Multiple PDFs: Packaged into ZIP file
@@ -199,20 +194,8 @@ DB_DATABASE=/absolute/path/to/database/database.sqlite
 # Queue
 QUEUE_CONNECTION=database
 
-# Broadcasting (Laravel Reverb)
-BROADCAST_CONNECTION=reverb
-REVERB_APP_ID=your-app-id
-REVERB_APP_KEY=your-app-key
-REVERB_APP_SECRET=your-app-secret
-REVERB_HOST=localhost
-REVERB_PORT=8080
-REVERB_SCHEME=http
-
-# Vite (for real-time updates)
-VITE_REVERB_APP_KEY="${REVERB_APP_KEY}"
-VITE_REVERB_HOST="${REVERB_HOST}"
-VITE_REVERB_PORT="${REVERB_PORT}"
-VITE_REVERB_SCHEME="${REVERB_SCHEME}"
+# Broadcasting (disabled)
+BROADCAST_CONNECTION=null
 ```
 
 ## Production Deployment
@@ -243,7 +226,6 @@ See `deploy.sh` for the complete deployment script.
 
 3. **Queue & WebSocket Setup**
    - Configure Supervisor for `queue:work`
-   - Set up process monitoring for `reverb:start`
    - Configure web server for WebSocket proxying
 
 ## Features in Detail
@@ -278,12 +260,12 @@ The main interface is organized into two distinct sections:
 
 ### Real-time Progress Tracking
 
-The application uses Laravel Reverb for real-time updates:
+The application uses Livewire polling for real-time updates:
 
-- **Server-side**: Jobs broadcast progress events via `JobProgressUpdated`
-- **Client-side**: Laravel Echo listens for WebSocket events and updates UI
-- **Channels**: Each batch has its own channel (`batch.{batchId}`)
+- **Server-side**: Jobs update database status and progress
+- **Client-side**: Livewire polls server every 100ms for updates
 - **Live Job Movement**: Jobs automatically move from active to completed section when finished
+- **Simple Architecture**: No WebSocket dependencies required
 
 ### Smart Download Logic
 

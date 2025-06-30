@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>Credit Note {{ $data['Reference'] ?? 'N/A' }}</title>
+    <title>Credit Note{{ !empty($data['Reference']) ? ' ' . $data['Reference'] : '' }}</title>
     <style>
         * {
             margin: 0;
@@ -273,7 +273,9 @@
                 </div>
                 <div class="document-title">
                     <h2>CREDIT NOTE</h2>
-                    <div class="document-number">{{ $data['Reference'] ?? 'N/A' }}</div>
+                    @if(!empty($data['Reference']))
+                    <div class="document-number">{{ $data['Reference'] }}</div>
+                    @endif
                 </div>
             </div>
         </div>
@@ -285,47 +287,30 @@
                 <div class="details-card">
                     <h3 class="details-title">Credit Note Details</h3>
                     <div class="details-grid clearfix">
+                        @if(!empty($data['Reference']))
                         <div class="detail-row">
                             <span class="detail-label">Reference:</span>
-                            <span class="detail-value">
-                                {{ $data['Reference'] ?? 'N/A' }}
-                                @if(isset($data['Outstanding GBP']) && floatval($data['Outstanding GBP']) > 0)
-                                    <span class="badge badge-outstanding">Outstanding</span>
-                                @else
-                                    <span class="badge badge-settled">Settled</span>
-                                @endif
-                            </span>
+                            <span class="detail-value">{{ $data['Reference'] }}</span>
                         </div>
+                        @endif
+                        @if(!empty($data['Date']))
                         <div class="detail-row">
                             <span class="detail-label">Date:</span>
-                            <span class="detail-value">
-                                @if(isset($data['Date']) && !empty($data['Date']) && $data['Date'] !== '1/1/1970')
-                                    @php
-                                        // Try multiple date formats
-                                        $dateFormats = ['d/m/Y', 'Y-m-d', 'm/d/Y', 'Y/m/d'];
-                                        $parsedDate = null;
-                                        foreach ($dateFormats as $format) {
-                                            $date = DateTime::createFromFormat($format, $data['Date']);
-                                            if ($date && $date->format($format) === $data['Date']) {
-                                                $parsedDate = $date;
-                                                break;
-                                            }
-                                        }
-                                    @endphp
-                                    {{ $parsedDate ? $parsedDate->format('d/m/Y') : $data['Date'] }}
-                                @else
-                                    N/A
-                                @endif
-                            </span>
+                            <span class="detail-value">{{ $data['Date'] }}</span>
                         </div>
+                        @endif
+                        @if(!empty($data['Number']))
                         <div class="detail-row">
                             <span class="detail-label">Number:</span>
-                            <span class="detail-value">{{ $data['Number'] ?? 'N/A' }}</span>
+                            <span class="detail-value">{{ $data['Number'] }}</span>
                         </div>
+                        @endif
+                        @if(!empty($data['Type']))
                         <div class="detail-row">
                             <span class="detail-label">Type:</span>
-                            <span class="detail-value">{{ $data['Type'] ?? 'Credit Note' }}</span>
+                            <span class="detail-value">{{ $data['Type'] }}</span>
                         </div>
+                        @endif
                     </div>
                 </div>
             </div>
@@ -341,28 +326,28 @@
                             </tr>
                         </thead>
                         <tbody>
+                            @if(!empty($data['Net GBP']))
                             <tr>
                                 <td>Net Amount</td>
-                                <td>£{{ number_format(floatval($data['Net GBP'] ?? 0), 2) }}</td>
-                            </tr>
-                            <tr>
-                                <td>VAT Amount</td>
-                                <td>£{{ number_format(floatval($data['VAT GBP'] ?? 0), 2) }}</td>
-                            </tr>
-                            @if(isset($data['Discount GBP']) && floatval($data['Discount GBP']) > 0)
-                            <tr>
-                                <td>Discount Applied</td>
-                                <td>-£{{ number_format(floatval($data['Discount GBP']), 2) }}</td>
+                                <td>£{{ $data['Net GBP'] }}</td>
                             </tr>
                             @endif
+                            @if(!empty($data['VAT GBP']))
+                            <tr>
+                                <td>VAT Amount</td>
+                                <td>£{{ $data['VAT GBP'] }}</td>
+                            </tr>
+                            @endif
+                            @if(!empty($data['Discount GBP']))
+                            <tr>
+                                <td>Discount Applied</td>
+                                <td>-£{{ $data['Discount GBP'] }}</td>
+                            </tr>
+                            @endif
+                            @if(!empty($data['Total GBP']))
                             <tr class="total-row">
                                 <td>Total Credit Amount</td>
-                                <td>£{{ number_format(floatval($data['Total GBP'] ?? 0), 2) }}</td>
-                            </tr>
-                            @if(isset($data['Outstanding GBP']) && floatval($data['Outstanding GBP']) > 0)
-                            <tr class="outstanding-row">
-                                <td>Outstanding Amount</td>
-                                <td>£{{ number_format(floatval($data['Outstanding GBP']), 2) }}</td>
+                                <td>£{{ $data['Total GBP'] }}</td>
                             </tr>
                             @endif
                         </tbody>
@@ -370,20 +355,6 @@
                 </div>
             </div>
 
-            <!-- Outstanding Balance Alert -->
-            @if(isset($data['Outstanding GBP']) && floatval($data['Outstanding GBP']) > 0)
-            <div class="section">
-                <div class="alert">
-                    <div class="alert-icon">⚠️</div>
-                    <div class="alert-content">
-                        <span class="font-semibold">Outstanding Balance:</span> 
-                        This credit note has an outstanding balance of 
-                        <span class="font-bold">£{{ number_format(floatval($data['Outstanding GBP']), 2) }}</span> 
-                        that requires attention.
-                    </div>
-                </div>
-            </div>
-            @endif
 
             <!-- Footer -->
             <div class="footer">

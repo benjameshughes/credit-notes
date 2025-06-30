@@ -86,8 +86,8 @@ class ProcessCsvToPdf implements ShouldQueue
         try {
             // Create filename using credit note number or fallback
             $filename = 'credit_note_';
-            if (! empty($data['Number'])) {
-                $filename .= Str::slug($data['Number']);
+            if (! empty($data['Reference'])) {
+                $filename .= $data['Reference'];
             } else {
                 $filename .= ($index + 1);
             }
@@ -182,20 +182,33 @@ class ProcessCsvToPdf implements ShouldQueue
         }
 
         $zip = new ZipArchive;
+        $result = $zip->open($fullZipPath, ZipArchive::CREATE);
 
-        if ($zip->open($fullZipPath, ZipArchive::CREATE) === true) {
+        if ($result === true) {
+            $addedFiles = 0;
             foreach ($pdfPaths as $pdfPath) {
                 $fullPdfPath = Storage::path($pdfPath);
                 if (file_exists($fullPdfPath)) {
-                    $zip->addFile($fullPdfPath, basename($pdfPath));
+                    if ($zip->addFile($fullPdfPath, basename($pdfPath))) {
+                        $addedFiles++;
+                    }
                 }
             }
+            
             $zip->close();
-
-            return $zipPath;
+            
+            // Verify the ZIP file was actually created and has content
+            if (file_exists($fullZipPath) && filesize($fullZipPath) > 0) {
+                Log::info("ZIP file created successfully: {$zipPath} with {$addedFiles} files");
+                return $zipPath;
+            } else {
+                Log::error("ZIP file was not created properly: {$zipPath}");
+                throw new \Exception('ZIP file was not created properly');
+            }
         }
 
-        throw new \Exception('Could not create zip file');
+        Log::error("Could not open ZIP file for creation: {$zipPath}, error code: {$result}");
+        throw new \Exception("Could not create zip file. Error code: {$result}");
     }
 
     private function cleanup($pdfPaths)

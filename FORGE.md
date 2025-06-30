@@ -38,9 +38,6 @@ This guide helps you deploy the Credit Notes Generator to Laravel Forge.
 2. **Update `.env` values:**
    ```env
    APP_URL=https://your-domain.com
-   REVERB_HOST=your-domain.com
-   REVERB_APP_KEY=generate-random-key
-   REVERB_APP_SECRET=generate-random-secret
    ```
 
 3. **Generate application key:**
@@ -73,14 +70,9 @@ This guide helps you deploy the Credit Notes Generator to Laravel Forge.
    Processes: 1
    ```
 
-## Step 7: WebSocket Configuration (Laravel Reverb)
+## Step 7: Additional Configuration
 
-### Option A: Run Reverb as a separate service
-
-1. **Create daemon in Forge:**
-   ```bash
-   # Command:
-   /usr/bin/php8.2 /home/forge/your-site/artisan reverb:start --host=0.0.0.0 --port=8080
+No additional WebSocket configuration needed since the application uses Livewire polling for real-time updates.
    
    # Directory:
    /home/forge/your-site
@@ -155,7 +147,6 @@ chown -R forge:www-data bootstrap/cache
 1. **Set up monitoring:**
    - Enable Forge monitoring
    - Monitor queue workers
-   - Monitor Reverb process (if using)
 
 2. **Log monitoring:**
    ```bash
@@ -166,12 +157,7 @@ chown -R forge:www-data bootstrap/cache
 
 ### Common Issues
 
-1. **WebSocket connection fails:**
-   - Check Nginx configuration
-   - Verify Reverb daemon is running
-   - Check firewall settings for port 8080
-
-2. **Queue jobs not processing:**
+1. **Queue jobs not processing:**
    - Restart queue workers in Forge
    - Check database queue table
    - Verify queue configuration
@@ -195,8 +181,6 @@ chown -R forge:www-data bootstrap/cache
 # Check queue status
 php artisan queue:work --once
 
-# Check Reverb status
-php artisan reverb:start --debug
 
 # Clear all caches
 php artisan optimize:clear
