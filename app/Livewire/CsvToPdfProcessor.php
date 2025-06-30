@@ -24,7 +24,6 @@ class CsvToPdfProcessor extends Component
 
     public $messageType = '';
 
-    public $activeBatches = []; // Track active batch IDs for real-time updates
 
     protected $rules = [
         'csvFile' => 'required|file|mimes:csv,txt|max:10240',
@@ -33,7 +32,6 @@ class CsvToPdfProcessor extends Component
     public function mount()
     {
         $this->loadJobs();
-        $this->updateActiveBatches();
     }
 
     public function uploadCsv()
@@ -80,9 +78,6 @@ class CsvToPdfProcessor extends Component
             $this->setMessage('success', 'CSV uploaded! Processing '.count($csvData).' records...');
             $this->reset('csvFile');
             $this->loadJobs();
-            
-            // Update active batches for echo listeners
-            $this->updateActiveBatches();
 
         } catch (\Exception $e) {
             $this->setMessage('error', 'Upload failed: '.$e->getMessage());
@@ -190,18 +185,6 @@ class CsvToPdfProcessor extends Component
         $this->messageType = '';
     }
     
-    private function updateActiveBatches()
-    {
-        // Track active batches for real-time updates
-        $this->activeBatches = collect($this->processingJobs)
-            ->pluck('batch_id')
-            ->unique()
-            ->values()
-            ->toArray();
-            
-        // Dispatch event to update JavaScript subscriptions
-        $this->dispatch('batchesUpdated', batches: $this->activeBatches);
-    }
     
 
     public function deleteJob($batchId)

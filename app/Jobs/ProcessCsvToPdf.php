@@ -4,9 +4,8 @@
 
 namespace App\Jobs;
 
-use App\Events\JobProgressUpdated;
 use App\Models\PdfGenerationJob;
-use Barryvdh\DomPDF\Facade\Pdf;
+use Spatie\LaravelPdf\Facades\Pdf;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -41,9 +40,6 @@ class ProcessCsvToPdf implements ShouldQueue
         try {
             $job->update(['status' => 'processing']);
 
-            // Broadcast processing status
-            $this->broadcastBatchProgress($job->batch_id);
-
             // Generate single PDF for this row
             $pdfPath = $this->generatePdf($this->rowData, $this->rowIndex, $job->batch_id);
 
@@ -76,9 +72,8 @@ class ProcessCsvToPdf implements ShouldQueue
 
             Log::error("PDF generation failed for job {$this->jobId}: ".$e->getMessage());
         } finally {
-            // Always broadcast progress and check batch completion
+            // Always check batch completion
             try {
-                $this->broadcastBatchProgress($job->batch_id);
                 $this->checkBatchCompletion($job->batch_id);
             } catch (\Exception $e) {
                 Log::error("Error in finally block for job {$this->jobId}: ".$e->getMessage());
@@ -89,12 +84,6 @@ class ProcessCsvToPdf implements ShouldQueue
     private function generatePdf($data, $index, $batchId)
     {
         try {
-            // Use the credit note template
-            $pdf = Pdf::loadView('pdf.credit-note-template', compact('data'));
-
-            // Set paper size
-            $pdf->setPaper('A4', 'portrait');
-
             // Create filename using credit note number or fallback
             $filename = 'credit_note_';
             if (! empty($data['Number'])) {
@@ -105,8 +94,18 @@ class ProcessCsvToPdf implements ShouldQueue
             $filename .= '.pdf';
 
             $path = 'pdfs/'.$batchId.'/'.$filename;
+            $fullPath = storage_path('app/'.$path);
 
-            Storage::put($path, $pdf->output());
+            // Ensure directory exists
+            $directory = dirname($fullPath);
+            if (!is_dir($directory)) {
+                mkdir($directory, 0755, true);
+            }
+
+            // Use Spatie Laravel PDF to generate PDF
+            Pdf::view('pdf.credit-note-template', compact('data'))
+                ->format('a4')
+                ->save($fullPath);
 
             return $path;
 
@@ -163,38 +162,12 @@ class ProcessCsvToPdf implements ShouldQueue
                             PdfGenerationJob::where('batch_id', $batchId)
                                 ->update(['single_pdf_path' => $singlePdfPath]);
                         }
-
-                        // Broadcast final completion status
-                        $this->broadcastBatchProgress($batchId);
                     }
                 }
             }
         });
     }
 
-    private function broadcastBatchProgress($batchId)
-    {
-        $jobs = PdfGenerationJob::where('batch_id', $batchId)->get();
-        $completedCount = $jobs->where('status', 'completed')->count();
-        $failedCount = $jobs->where('status', 'failed')->count();
-        $processingCount = $jobs->where('status', 'processing')->count();
-        $totalCount = $jobs->count();
-
-        // Get ZIP or single PDF path
-        $zipPath = $jobs->whereNotNull('zip_path')->first()?->zip_path;
-        $singlePdfPath = $jobs->whereNotNull('single_pdf_path')->first()?->single_pdf_path;
-
-        JobProgressUpdated::dispatch(
-            $batchId,
-            'processing', // Individual job status (will be calculated in event)
-            $totalCount,
-            $completedCount,
-            $failedCount,
-            $processingCount,
-            $zipPath,
-            $singlePdfPath
-        );
-    }
 
     private function createZipFile($pdfPaths, $originalFilename)
     {

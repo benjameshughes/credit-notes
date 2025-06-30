@@ -1,4 +1,4 @@
-<div class="max-w-4xl mx-auto p-6">
+<div class="max-w-4xl mx-auto p-6" wire:poll.100ms="loadJobs">
     <div class="mb-8">
         <h1 class="text-3xl font-bold text-zinc-900 dark:text-zinc-100">CSV to PDF Processor</h1>
     </div>
@@ -268,60 +268,4 @@
     </div>
 </div>
 
-<script>
-document.addEventListener('livewire:initialized', () => {
-    // Initialize Echo subscription manager
-    if (!window.echoManager) {
-        window.echoManager = {
-            channels: {},
-            
-            subscribe(batchId, componentId) {
-                if (this.channels[batchId]) return;
-                
-                this.channels[batchId] = window.Echo.channel(`batch.${batchId}`)
-                    .listen('.job.progress.updated', (e) => {
-                        const component = Livewire.find(componentId);
-                        if (component) {
-                            component.call('loadJobs');
-                        }
-                    });
-            },
-            
-            unsubscribe(batchId) {
-                if (this.channels[batchId]) {
-                    window.Echo.leave(`batch.${batchId}`);
-                    delete this.channels[batchId];
-                }
-            },
-            
-            updateSubscriptions(activeBatches, componentId) {
-                // Subscribe to new batches
-                activeBatches.forEach(batchId => {
-                    this.subscribe(batchId, componentId);
-                });
-                
-                // Unsubscribe from completed batches
-                Object.keys(this.channels).forEach(batchId => {
-                    if (!activeBatches.includes(batchId)) {
-                        this.unsubscribe(batchId);
-                    }
-                });
-            }
-        };
-    }
-    
-    // Get component reference
-    const component = @this;
-    
-    // Subscribe to initial active batches
-    const activeBatches = @json($activeBatches);
-    window.echoManager.updateSubscriptions(activeBatches, component.id);
-    
-    // Listen for batch updates
-    Livewire.on('batchesUpdated', (event) => {
-        const batches = event.detail?.batches || event.batches || [];
-        window.echoManager.updateSubscriptions(batches, component.id);
-    });
-});
-</script>
 
