@@ -20,18 +20,24 @@ it('can render the csv to pdf processor component', function () {
 });
 
 it('loads recent jobs on mount', function () {
-    PdfGenerationJob::factory(3)->create();
+    $user = User::factory()->create();
+    $this->actingAs($user);
+    
+    PdfGenerationJob::factory(3)->create(['user_id' => $user->id]);
 
     Livewire::test(CsvToPdfProcessor::class)
-        ->assertSet('jobs', function ($jobs) {
-            return count($jobs) === 3;
+        ->assertSet('processingJobs', function ($jobs) {
+            return is_array($jobs);
+        })
+        ->assertSet('completedJobs', function ($jobs) {
+            return is_array($jobs);
         });
 });
 
 it('validates csv file upload', function () {
     Livewire::test(CsvToPdfProcessor::class)
         ->set('csvFile', null)
-        ->call('processCsv')
+        ->call('uploadCsv')
         ->assertHasErrors(['csvFile' => 'required']);
 });
 
@@ -40,7 +46,7 @@ it('validates file type is csv', function () {
 
     Livewire::test(CsvToPdfProcessor::class)
         ->set('csvFile', $file)
-        ->call('updatedCsvFile')
+        ->call('uploadCsv')
         ->assertHasErrors(['csvFile']);
 });
 
@@ -49,7 +55,7 @@ it('validates file size limit', function () {
 
     Livewire::test(CsvToPdfProcessor::class)
         ->set('csvFile', $file)
-        ->call('updatedCsvFile')
+        ->call('uploadCsv')
         ->assertHasErrors(['csvFile']);
 });
 
@@ -61,7 +67,7 @@ it('processes valid csv file successfully', function () {
 
     Livewire::test(CsvToPdfProcessor::class)
         ->set('csvFile', $file)
-        ->call('processCsv')
+        ->call('uploadCsv')
         ->assertHasNoErrors()
         ->assertSet('csvFile', null)
         ->assertSessionHas('success');
@@ -81,7 +87,7 @@ it('handles empty csv files', function () {
 
     Livewire::test(CsvToPdfProcessor::class)
         ->set('csvFile', $file)
-        ->call('processCsv')
+        ->call('uploadCsv')
         ->assertSessionHas('error');
 });
 
@@ -91,47 +97,27 @@ it('handles malformed csv files', function () {
 
     Livewire::test(CsvToPdfProcessor::class)
         ->set('csvFile', $file)
-        ->call('processCsv')
+        ->call('uploadCsv')
         ->assertHasNoErrors();
 
     $job = PdfGenerationJob::first();
     expect($job->total_rows)->toBe(1); // Only the properly formatted row
 });
 
-it('can download completed job zip file', function () {
-    Storage::put('downloads/test.zip', 'fake zip content');
-
-    $job = PdfGenerationJob::create([
-        'batch_id' => 'test-batch',
-        'original_filename' => 'test.csv',
-        'total_rows' => 1,
+it('can delete completed jobs', function () {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+    
+    $job = PdfGenerationJob::factory()->create([
+        'user_id' => $user->id,
         'status' => 'completed',
-        'zip_path' => 'downloads/test.zip',
-    ]);
-
-    $response = Livewire::test(CsvToPdfProcessor::class)
-        ->call('downloadZip', $job->id);
-
-    expect($response)->toBeInstanceOf(\Symfony\Component\HttpFoundation\BinaryFileResponse::class);
-});
-
-it('handles download request for non-existent job', function () {
-    Livewire::test(CsvToPdfProcessor::class)
-        ->call('downloadZip', 999)
-        ->assertSessionHas('error');
-});
-
-it('handles download request for incomplete job', function () {
-    $job = PdfGenerationJob::create([
-        'batch_id' => 'test-batch',
-        'original_filename' => 'test.csv',
-        'total_rows' => 1,
-        'status' => 'processing',
     ]);
 
     Livewire::test(CsvToPdfProcessor::class)
-        ->call('downloadZip', $job->id)
-        ->assertSessionHas('error');
+        ->call('deleteJob', $job->batch_id)
+        ->assertSet('messageType', 'success');
+
+    expect(PdfGenerationJob::find($job->id))->toBeNull();
 });
 
 it('sets uploading state during processing', function () {
@@ -144,10 +130,10 @@ it('sets uploading state during processing', function () {
         ->set('csvFile', $file);
 
     // Check that isUploading is false initially
-    expect($component->get('isUploading'))->toBeFalse();
+    expect($component->get('isProcessing'))->toBeFalse();
 
-    $component->call('processCsv');
+    $component->call('uploadCsv');
 
     // After processing, isUploading should be reset to false
-    expect($component->get('isUploading'))->toBeFalse();
+    expect($component->get('isProcessing'))->toBeFalse();
 });

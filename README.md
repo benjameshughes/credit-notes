@@ -22,7 +22,7 @@ A Laravel 12 application for processing CSV files and generating credit note PDF
 - **Livewire 3** - Reactive frontend components
 - **Laravel Reverb** - Real-time WebSocket server (first-party)
 - **Laravel Echo** - Frontend WebSocket client
-- **DomPDF** - PDF generation
+- **Spatie Laravel PDF** - PDF generation using Chromium/Browsershot
 - **Tailwind CSS 4** - Utility-first CSS framework
 - **Flux UI** - Modern UI components for Livewire
 - **SQLite** - File-based database
