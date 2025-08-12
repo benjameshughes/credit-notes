@@ -12,6 +12,6 @@ class BatchCompleted
 
     public function __construct(
         public string $batchId,
-        public int $userId
+        public ?int $userId = null
     ) {}
 }

@@ -14,9 +14,9 @@ class DownloadReady implements ShouldBroadcast
 
     public function __construct(
         public string $batchId,
-        public int $userId,
-        public string $downloadType, // 'zip' or 'single_pdf'
-        public string $downloadPath
+        public ?int $userId = null,
+        public string $downloadType = '', // 'zip' or 'single_pdf'
+        public string $downloadPath = ''
     ) {}
 
     /**
@@ -24,6 +24,11 @@ class DownloadReady implements ShouldBroadcast
      */
     public function broadcastOn(): array
     {
+        // For public access (no user), don't broadcast
+        if ($this->userId === null) {
+            return [];
+        }
+        
         return [
             new PrivateChannel('user.' . $this->userId),
         ];

@@ -14,7 +14,7 @@ class BatchDownloadStarted implements ShouldBroadcast
 
     public function __construct(
         public string $batchId,
-        public int $userId
+        public ?int $userId = null
     ) {}
 
     /**
@@ -22,6 +22,11 @@ class BatchDownloadStarted implements ShouldBroadcast
      */
     public function broadcastOn(): array
     {
+        // For public access (no user), don't broadcast
+        if ($this->userId === null) {
+            return [];
+        }
+        
         return [
             new PrivateChannel('user.' . $this->userId),
         ];

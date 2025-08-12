@@ -205,6 +205,11 @@
                                         <flux:icon.clock class="size-3 mr-1"/>
                                         Pending
                                     </flux:badge>
+                                @elseif($job['status'] === 'paused')
+                                    <flux:badge variant="orange" size="sm">
+                                        <flux:icon.pause class="size-3 mr-1"/>
+                                        Paused
+                                    </flux:badge>
                                 @else
                                     <flux:badge variant="red" size="sm">
                                         <flux:icon.x-circle class="size-3 mr-1"/>
@@ -215,7 +220,7 @@
                         </div>
 
                         {{-- Stats Grid --}}
-                        <div class="grid grid-cols-4 gap-4 mb-4 text-sm">
+                        <div class="grid grid-cols-5 gap-3 mb-4 text-sm">
                             <div class="text-center p-3 bg-zinc-100 dark:bg-zinc-800 rounded-lg">
                                 <div class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{{ $job['total_rows'] }}</div>
                                 <div class="text-zinc-500 dark:text-zinc-400">Total</div>
@@ -227,6 +232,10 @@
                             <div class="text-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                                 <div class="text-2xl font-bold text-blue-600 dark:text-blue-400">{{ $job['processing_rows'] }}</div>
                                 <div class="text-blue-500 dark:text-blue-400/70">Processing</div>
+                            </div>
+                            <div class="text-center p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+                                <div class="text-2xl font-bold text-orange-600 dark:text-orange-400">{{ $job['paused_rows'] ?? 0 }}</div>
+                                <div class="text-orange-500 dark:text-orange-400/70">Paused</div>
                             </div>
                             <div class="text-center p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
                                 <div class="text-2xl font-bold text-red-600 dark:text-red-400">{{ $job['failed_rows'] }}</div>
@@ -264,8 +273,79 @@
                         @endif
 
                         {{-- Action Buttons --}}
-                        @if($job['status'] === 'completed' || $job['status'] === 'completed_with_errors')
-                            <div class="flex justify-end gap-3">
+                        <div class="flex justify-end gap-3">
+                            @if($job['status'] === 'pending')
+                                {{-- Pause button for pending jobs --}}
+                                <flux:button
+                                        type="button"
+                                        variant="ghost"
+                                        icon="pause"
+                                        wire:click="pauseJob('{{ $job['batch_id'] }}')"
+                                >
+                                    Pause Job
+                                </flux:button>
+                                
+                                {{-- Force remove button for stuck jobs --}}
+                                <flux:button
+                                        type="button"
+                                        variant="danger"
+                                        icon="x-mark"
+                                        wire:click="confirmForceRemove('{{ $job['batch_id'] }}')"
+                                >
+                                    Force Remove
+                                </flux:button>
+                            @elseif($job['status'] === 'paused')
+                                {{-- Resume button for paused jobs --}}
+                                <flux:button
+                                        type="button"
+                                        variant="primary"
+                                        icon="play"
+                                        wire:click="resumeJob('{{ $job['batch_id'] }}')"
+                                >
+                                    Resume Job
+                                </flux:button>
+                                
+                                {{-- Force remove button --}}
+                                <flux:button
+                                        type="button"
+                                        variant="danger"
+                                        icon="x-mark"
+                                        wire:click="confirmForceRemove('{{ $job['batch_id'] }}')"
+                                >
+                                    Force Remove
+                                </flux:button>
+                            @elseif($job['status'] === 'processing')
+                                {{-- Pause button for processing jobs --}}
+                                <flux:button
+                                        type="button"
+                                        variant="ghost"
+                                        icon="pause"
+                                        wire:click="pauseJob('{{ $job['batch_id'] }}')"
+                                >
+                                    Pause Job
+                                </flux:button>
+                                
+                                {{-- Force remove for processing jobs --}}
+                                <flux:button
+                                        type="button"
+                                        variant="danger"
+                                        icon="x-mark"
+                                        wire:click="confirmForceRemove('{{ $job['batch_id'] }}')"
+                                >
+                                    Force Remove
+                                </flux:button>
+                            @elseif($job['status'] === 'packaging')
+                                {{-- Only force remove for packaging jobs that might be stuck --}}
+                                <flux:button
+                                        type="button"
+                                        variant="danger"
+                                        icon="x-mark"
+                                        wire:click="confirmForceRemove('{{ $job['batch_id'] }}')"
+                                >
+                                    Force Remove
+                                </flux:button>
+                            @elseif($job['status'] === 'completed' || $job['status'] === 'completed_with_errors')
+                                {{-- Download and delete buttons for completed jobs --}}
                                 @if($job['download_available'])
                                     <flux:button
                                             type="button"
@@ -290,8 +370,18 @@
                                 >
                                     Delete
                                 </flux:button>
-                            </div>
-                        @endif
+                            @else
+                                {{-- Failed or unknown status jobs - force remove option --}}
+                                <flux:button
+                                        type="button"
+                                        variant="danger"
+                                        icon="x-mark"
+                                        wire:click="confirmForceRemove('{{ $job['batch_id'] }}')"
+                                >
+                                    Remove
+                                </flux:button>
+                            @endif
+                        </div>
                     </div>
                 @endforeach
             </div>
@@ -348,7 +438,7 @@
                         </div>
 
                         {{-- Stats Grid --}}
-                        <div class="grid grid-cols-4 gap-4 mb-4 text-sm">
+                        <div class="grid grid-cols-5 gap-3 mb-4 text-sm">
                             <div class="text-center p-3 bg-zinc-100 dark:bg-zinc-800 rounded-lg">
                                 <div class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{{ $job['total_rows'] }}</div>
                                 <div class="text-zinc-500 dark:text-zinc-400">Total</div>
@@ -360,6 +450,10 @@
                             <div class="text-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                                 <div class="text-2xl font-bold text-blue-600 dark:text-blue-400">{{ $job['processing_rows'] }}</div>
                                 <div class="text-blue-500 dark:text-blue-400/70">Processing</div>
+                            </div>
+                            <div class="text-center p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+                                <div class="text-2xl font-bold text-orange-600 dark:text-orange-400">{{ $job['paused_rows'] ?? 0 }}</div>
+                                <div class="text-orange-500 dark:text-orange-400/70">Paused</div>
                             </div>
                             <div class="text-center p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
                                 <div class="text-2xl font-bold text-red-600 dark:text-red-400">{{ $job['failed_rows'] }}</div>
@@ -399,6 +493,71 @@
             </div>
         @endif
     </div>
+
+    {{-- Force Remove Confirmation Modal --}}
+    <flux:modal name="force-remove-modal" class="max-w-md">
+            <div class="space-y-6">
+                {{-- Modal Header --}}
+                <div class="flex items-start space-x-4">
+                    <div class="flex-shrink-0">
+                        <div class="flex items-center justify-center w-12 h-12 mx-auto bg-red-100 rounded-full dark:bg-red-900/20">
+                            <flux:icon.exclamation-triangle class="w-6 h-6 text-red-600 dark:text-red-400" />
+                        </div>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <h3 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+                            Force Remove Job
+                        </h3>
+                        <p class="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+                            This action will forcefully remove the job and all associated files. This should only be used for stuck or failed jobs.
+                        </p>
+                    </div>
+                </div>
+
+                {{-- Warning Content --}}
+                <div class="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                    <div class="flex items-start space-x-3">
+                        <flux:icon.shield-exclamation class="w-5 h-5 text-red-500 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                        <div class="text-sm">
+                            <p class="font-medium text-red-800 dark:text-red-200 mb-1">
+                                ⚠️ This action cannot be undone
+                            </p>
+                            <ul class="text-red-700 dark:text-red-300 space-y-1 ml-4">
+                                <li>• Job will be permanently removed from the database</li>
+                                <li>• All generated PDF files will be deleted</li>
+                                <li>• ZIP downloads will become unavailable</li>
+                                <li>• Progress tracking will be lost</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Action Buttons --}}
+                <div class="flex justify-end space-x-3 pt-4">
+                    <flux:button
+                        variant="ghost"
+                        wire:click="cancelForceRemove"
+                    >
+                        Cancel
+                    </flux:button>
+                    <flux:button
+                        variant="danger"
+                        icon="trash"
+                        wire:click="executeForceRemove"
+                        wire:loading.attr="disabled"
+                        wire:target="executeForceRemove"
+                    >
+                        <span wire:loading.remove wire:target="executeForceRemove">
+                            Force Remove Job
+                        </span>
+                        <span wire:loading wire:target="executeForceRemove">
+                            <flux:icon.arrow-path class="w-4 h-4 mr-2 animate-spin" />
+                            Removing...
+                        </span>
+                    </flux:button>
+                </div>
+            </div>
+        </flux:modal>
 </div>
 
 

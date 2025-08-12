@@ -12,7 +12,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
-use Spatie\LaravelPdf\Facades\Pdf;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class ProcessCsvToPdf implements ShouldQueue
 {
@@ -39,7 +39,18 @@ class ProcessCsvToPdf implements ShouldQueue
         }
 
         try {
+            // Check if this batch is paused before starting processing
+            if (cache()->has("batch_paused_{$job->batch_id}")) {
+                // Batch is paused - mark this job as paused and don't process
+                $job->update(['status' => 'paused']);
+                \Log::info("Job {$job->id} paused due to batch pause flag for batch {$job->batch_id}");
+                return;
+            }
+            
             $job->update(['status' => 'processing']);
+            
+            // Add a small delay to simulate processing time for testing pause functionality
+            sleep(2);
 
             // Generate single PDF for this row
             $pdfPath = $this->generatePdf($this->rowData, $this->rowIndex, $job->batch_id);
@@ -108,21 +119,11 @@ class ProcessCsvToPdf implements ShouldQueue
                 mkdir($directory, 0755, true);
             }
 
-            // Use Spatie Laravel PDF to generate PDF
-            Log::info("Calling Spatie PDF generation...");
+            // Use DomPDF to generate PDF
+            Log::info("Calling DomPDF generation...");
             
-            $pdf = Pdf::view('pdf.credit-note-template', compact('data'))
-                ->format('a4');
-                
-            // Add server-safe Chrome arguments
-            $chromeArgs = config('browsershot.chrome_arguments', [
-                '--no-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-gpu',
-                '--single-process',
-            ]);
-            
-            $pdf->chromiumArguments($chromeArgs);
+            $pdf = Pdf::loadView('pdf.credit-note-template', compact('data'))
+                ->setPaper('a4', 'portrait');
             
             $pdf->save($fullPath);
 

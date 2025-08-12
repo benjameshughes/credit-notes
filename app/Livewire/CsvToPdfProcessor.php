@@ -7,6 +7,7 @@ use App\Models\PdfGenerationJob;
 use Illuminate\Support\Str;
 use Livewire\Component;
 use Livewire\WithFileUploads;
+use Flux\Flux;
 
 class CsvToPdfProcessor extends Component
 {
@@ -23,6 +24,10 @@ class CsvToPdfProcessor extends Component
     public $toasts = [];
 
     public $showMapping = false;
+
+    public $showForceRemoveModal = false;
+
+    public $jobToRemove = null;
 
     public $csvHeaders = [];
 
@@ -117,14 +122,15 @@ class CsvToPdfProcessor extends Component
 
     public function loadJobs()
     {
-        // Group jobs by batch_id and calculate batch-level progress - only for current user
-        $batches = PdfGenerationJob::where('user_id', auth()->id())
+        // Group jobs by batch_id and calculate batch-level progress - all jobs (public access)
+        $batches = PdfGenerationJob::query()
             ->select('batch_id', 'original_filename')
             ->selectRaw('MIN(created_at) as created_at')
             ->selectRaw('COUNT(*) as total_rows')
             ->selectRaw('SUM(CASE WHEN status = "completed" THEN 1 ELSE 0 END) as completed_rows')
             ->selectRaw('SUM(CASE WHEN status = "failed" THEN 1 ELSE 0 END) as failed_rows')
             ->selectRaw('SUM(CASE WHEN status = "processing" THEN 1 ELSE 0 END) as processing_rows')
+            ->selectRaw('SUM(CASE WHEN status = "paused" THEN 1 ELSE 0 END) as paused_rows')
             ->selectRaw('COALESCE(MAX(zip_path), "") as zip_path')
             ->selectRaw('COALESCE(MAX(single_pdf_path), "") as single_pdf_path')
             ->selectRaw('COALESCE(MAX(download_status), "pending") as download_status')
@@ -137,12 +143,16 @@ class CsvToPdfProcessor extends Component
             $completedCount = $batch->completed_rows;
             $failedCount = $batch->failed_rows;
             $processingCount = $batch->processing_rows;
+            $pausedCount = $batch->paused_rows;
             $totalCount = $batch->total_rows;
 
             // Determine overall batch status based on job completion and download status
             if ($completedCount + $failedCount === $totalCount) {
                 // All jobs are done, but check download status
-                if ($batch->download_status === 'creating_download') {
+                if ($failedCount === $totalCount) {
+                    // All jobs failed
+                    $status = 'failed';
+                } elseif ($batch->download_status === 'creating_download') {
                     $status = 'packaging';
                 } elseif ($batch->download_status === 'ready') {
                     $status = $failedCount > 0 ? 'completed_with_errors' : 'completed';
@@ -152,6 +162,12 @@ class CsvToPdfProcessor extends Component
                     // Jobs are done but download hasn't started yet - show packaging state
                     $status = 'packaging';
                 }
+            } elseif ($pausedCount === $totalCount) {
+                // All jobs are paused
+                $status = 'paused';
+            } elseif ($pausedCount > 0) {
+                // Some jobs are paused, some might be other statuses
+                $status = 'paused';
             } elseif ($processingCount > 0 || $completedCount > 0) {
                 $status = 'processing';
             } else {
@@ -167,6 +183,7 @@ class CsvToPdfProcessor extends Component
                 'completed_rows' => $completedCount,
                 'failed_rows' => $failedCount,
                 'processing_rows' => $processingCount,
+                'paused_rows' => $pausedCount,
                 'status' => $status,
                 'download_status' => $batch->download_status,
                 'progress' => $progress,
@@ -179,7 +196,7 @@ class CsvToPdfProcessor extends Component
         });
 
         // Separate processing and completed jobs
-        $this->processingJobs = $allJobs->whereIn('status', ['pending', 'processing', 'packaging'])->values()->toArray();
+        $this->processingJobs = $allJobs->whereIn('status', ['pending', 'processing', 'packaging', 'paused', 'failed'])->values()->toArray();
         $this->completedJobs = $allJobs->whereIn('status', ['completed', 'completed_with_errors', 'download_failed'])->values()->toArray();
     }
 
@@ -198,6 +215,48 @@ class CsvToPdfProcessor extends Component
         $this->toasts = array_filter($this->toasts, function($toast) use ($toastId) {
             return $toast['id'] !== $toastId;
         });
+    }
+
+    public function confirmForceRemove($batchId)
+    {
+        $this->jobToRemove = $batchId;
+        $this->showForceRemoveModal = true;
+        
+        // Show Flux modal in browser
+        try {
+            Flux::modal('force-remove-modal')->show();
+        } catch (\Exception $e) {
+            // Flux may not be available in tests, that's ok
+        }
+    }
+
+    public function cancelForceRemove()
+    {
+        $this->showForceRemoveModal = false;
+        $this->jobToRemove = null;
+        
+        // Close Flux modal in browser
+        try {
+            Flux::modal('force-remove-modal')->close();
+        } catch (\Exception $e) {
+            // Flux may not be available in tests, that's ok
+        }
+    }
+
+    public function executeForceRemove()
+    {
+        if ($this->jobToRemove) {
+            $this->forceRemoveJob($this->jobToRemove);
+        }
+        $this->showForceRemoveModal = false;
+        $this->jobToRemove = null;
+        
+        // Close Flux modal in browser
+        try {
+            Flux::modal('force-remove-modal')->close();
+        } catch (\Exception $e) {
+            // Flux may not be available in tests, that's ok
+        }
     }
 
     private function getSmartMapping($headers)
@@ -260,7 +319,7 @@ class CsvToPdfProcessor extends Component
                     'status' => 'pending',
                     'row_data' => json_encode($mappedData), // Store the mapped data
                     'row_index' => $index,
-                    'user_id' => auth()->id(),
+                    'user_id' => null, // Public access - no user association
                 ]);
 
                 // Dispatch individual processing job with mapped data
@@ -295,12 +354,103 @@ class CsvToPdfProcessor extends Component
         return $mappedData;
     }
 
+    public function pauseJob($batchId)
+    {
+        try {
+            // Set a pause flag in cache for this batch
+            cache()->put("batch_paused_{$batchId}", true, 3600); // 1 hour expiry
+            
+            // Get all pending and processing jobs in the batch
+            $pendingJobs = PdfGenerationJob::where('batch_id', $batchId)
+                ->where('status', 'pending')
+                ->get();
+                
+            $processingJobs = PdfGenerationJob::where('batch_id', $batchId)
+                ->where('status', 'processing')
+                ->get();
+
+            // Mark pending jobs as paused immediately
+            foreach ($pendingJobs as $job) {
+                $job->update(['status' => 'paused']);
+            }
+
+            $totalAffected = $pendingJobs->count();
+            if ($processingJobs->count() > 0) {
+                $this->addToast('success', "Batch paused. {$totalAffected} pending jobs paused immediately. {$processingJobs->count()} active jobs will pause after completing current PDF.");
+            } else {
+                $this->addToast('success', "Batch paused. {$totalAffected} jobs paused.");
+            }
+            
+            $this->loadJobs();
+
+        } catch (\Exception $e) {
+            $this->addToast('error', 'Failed to pause job: '.$e->getMessage());
+        }
+    }
+
+    public function resumeJob($batchId)
+    {
+        try {
+            // Clear the pause flag from cache
+            cache()->forget("batch_paused_{$batchId}");
+            
+            // Get all paused jobs in the batch (public access)
+            $jobs = PdfGenerationJob::where('batch_id', $batchId)
+                ->where('status', 'paused')
+                ->get();
+
+            if ($jobs->isEmpty()) {
+                $this->addToast('error', 'No paused jobs found to resume.');
+                return;
+            }
+
+            // Resume paused jobs by setting them back to pending and re-dispatching
+            foreach ($jobs as $job) {
+                $job->update(['status' => 'pending']);
+                
+                // Re-dispatch the job
+                $rowData = json_decode($job->row_data, true);
+                ProcessCsvToPdf::dispatch($job->id, $rowData, $job->row_index);
+            }
+
+            $this->addToast('success', 'Batch resumed. ' . $jobs->count() . ' jobs resumed and queued for processing.');
+            $this->loadJobs();
+
+        } catch (\Exception $e) {
+            $this->addToast('error', 'Failed to resume job: '.$e->getMessage());
+        }
+    }
+
+    public function forceRemoveJob($batchId)
+    {
+        try {
+            // Get all jobs in the batch (public access)
+            $jobs = PdfGenerationJob::where('batch_id', $batchId)
+                ->get();
+
+            if ($jobs->isEmpty()) {
+                $this->addToast('error', 'Job not found or you do not have permission to remove it.');
+                return;
+            }
+
+            // Force delete all jobs in the batch regardless of status (for stuck jobs)
+            foreach ($jobs as $job) {
+                $job->delete();
+            }
+
+            $this->addToast('success', 'Job forcefully removed and files cleaned up.');
+            $this->loadJobs();
+
+        } catch (\Exception $e) {
+            $this->addToast('error', 'Failed to remove job: '.$e->getMessage());
+        }
+    }
+
     public function deleteJob($batchId)
     {
         try {
-            // Get all jobs in the batch for the current user
+            // Get all jobs in the batch (public access)
             $jobs = PdfGenerationJob::where('batch_id', $batchId)
-                ->where('user_id', auth()->id())
                 ->get();
 
             if ($jobs->isEmpty()) {
@@ -308,18 +458,9 @@ class CsvToPdfProcessor extends Component
                 return;
             }
 
-            // Check authorization for deletion using policy
-            $firstJob = $jobs->first();
-            if (! auth()->user()->can('delete', $firstJob)) {
-                $this->addToast('error', 'Cannot delete job while it is still processing.');
-                return;
-            }
-
             // Delete all jobs in the batch (this will also delete associated files)
             foreach ($jobs as $job) {
-                if (auth()->user()->can('delete', $job)) {
-                    $job->delete();
-                }
+                $job->delete();
             }
 
             $this->addToast('success', 'Job and associated files deleted successfully.');
