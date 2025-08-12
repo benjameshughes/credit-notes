@@ -29,24 +29,25 @@ class CleanupPendingJobs extends Command
     {
         $hours = $this->option('hours');
         $cutoffTime = now()->subHours($hours);
-        
+
         $this->info("Cleaning up pending jobs older than {$hours} hours...");
-        
+
         // Find old pending jobs
         $oldPendingJobs = PdfGenerationJob::where('status', 'pending')
             ->where('created_at', '<', $cutoffTime)
             ->get();
-            
+
         if ($oldPendingJobs->isEmpty()) {
             $this->info('No old pending jobs found.');
+
             return Command::SUCCESS;
         }
-        
+
         $this->info("Found {$oldPendingJobs->count()} old pending jobs.");
-        
+
         $deletedCount = 0;
         $failedCount = 0;
-        
+
         foreach ($oldPendingJobs as $job) {
             try {
                 // This will also clean up any associated files
@@ -54,16 +55,16 @@ class CleanupPendingJobs extends Command
                 $deletedCount++;
             } catch (\Exception $e) {
                 $failedCount++;
-                $this->error("Failed to delete job ID {$job->id}: " . $e->getMessage());
+                $this->error("Failed to delete job ID {$job->id}: ".$e->getMessage());
             }
         }
-        
+
         $this->info("Successfully deleted {$deletedCount} jobs.");
-        
+
         if ($failedCount > 0) {
             $this->warn("Failed to delete {$failedCount} jobs.");
         }
-        
+
         return Command::SUCCESS;
     }
 }

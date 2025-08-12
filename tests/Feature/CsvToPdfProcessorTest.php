@@ -22,7 +22,7 @@ it('can render the csv to pdf processor component', function () {
 it('loads recent jobs on mount', function () {
     $user = User::factory()->create();
     $this->actingAs($user);
-    
+
     PdfGenerationJob::factory(3)->create(['user_id' => $user->id]);
 
     Livewire::test(CsvToPdfProcessor::class)
@@ -65,21 +65,23 @@ it('processes valid csv file successfully', function () {
     $csvContent = "Number,Customer,Amount\n123,John Doe,100.00\n124,Jane Smith,200.00";
     $file = UploadedFile::fake()->createWithContent('test.csv', $csvContent);
 
-    Livewire::test(CsvToPdfProcessor::class)
+    $component = Livewire::test(CsvToPdfProcessor::class)
         ->set('csvFile', $file)
         ->call('uploadCsv')
         ->assertHasNoErrors()
         ->assertSet('csvFile', null)
-        ->assertSessionHas('success');
+        ->assertSet('showMapping', true)
+        ->assertSet('csvHeaders', ['Number', 'Customer', 'Amount']);
+
+    // Now confirm the mapping
+    $component->call('confirmMapping')
+        ->assertSet('messageType', 'success')
+        ->assertSet('message', function ($message) {
+            return str_contains($message, 'Processing 2 records');
+        });
 
     Bus::assertDispatched(ProcessCsvToPdf::class);
-
-    expect(PdfGenerationJob::count())->toBe(1);
-
-    $job = PdfGenerationJob::first();
-    expect($job->original_filename)->toBe('test.csv')
-        ->and($job->total_rows)->toBe(2)
-        ->and($job->status)->toBe('pending');
+    expect(PdfGenerationJob::count())->toBe(2); // One job per CSV row
 });
 
 it('handles empty csv files', function () {
@@ -88,7 +90,10 @@ it('handles empty csv files', function () {
     Livewire::test(CsvToPdfProcessor::class)
         ->set('csvFile', $file)
         ->call('uploadCsv')
-        ->assertSessionHas('error');
+        ->assertSet('messageType', 'error')
+        ->assertSet('message', function ($message) {
+            return str_contains($message, 'empty') || str_contains($message, 'CSV file is empty');
+        });
 });
 
 it('handles malformed csv files', function () {
@@ -98,16 +103,19 @@ it('handles malformed csv files', function () {
     Livewire::test(CsvToPdfProcessor::class)
         ->set('csvFile', $file)
         ->call('uploadCsv')
-        ->assertHasNoErrors();
+        ->assertSet('messageType', 'error')
+        ->assertSet('message', function ($message) {
+            return str_contains($message, 'empty') || str_contains($message, 'no valid data');
+        });
 
-    $job = PdfGenerationJob::first();
-    expect($job->total_rows)->toBe(1); // Only the properly formatted row
+    // No jobs should be created as all rows are malformed
+    expect(PdfGenerationJob::count())->toBe(0);
 });
 
 it('can delete completed jobs', function () {
     $user = User::factory()->create();
     $this->actingAs($user);
-    
+
     $job = PdfGenerationJob::factory()->create([
         'user_id' => $user->id,
         'status' => 'completed',
@@ -129,11 +137,12 @@ it('sets uploading state during processing', function () {
     $component = Livewire::test(CsvToPdfProcessor::class)
         ->set('csvFile', $file);
 
-    // Check that isUploading is false initially
+    // Check that isProcessing is false initially
     expect($component->get('isProcessing'))->toBeFalse();
 
     $component->call('uploadCsv');
 
-    // After processing, isUploading should be reset to false
+    // After upload, isProcessing should be reset to false but showMapping should be true
     expect($component->get('isProcessing'))->toBeFalse();
+    expect($component->get('showMapping'))->toBeTrue();
 });

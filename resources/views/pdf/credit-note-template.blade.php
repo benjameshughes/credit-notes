@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>Credit Note{{ !empty($data['Reference']) ? ' ' . $data['Reference'] : '' }}</title>
+    <title>Credit Note{{ !empty($data['reference']) ? ' ' . $data['reference'] : '' }}</title>
     <style>
         * {
             margin: 0;
@@ -273,8 +273,8 @@
                 </div>
                 <div class="document-title">
                     <h2>CREDIT NOTE</h2>
-                    @if(!empty($data['Reference']))
-                    <div class="document-number">{{ $data['Reference'] }}</div>
+                    @if(!empty($data['reference']))
+                    <div class="document-number">{{ $data['reference'] }}</div>
                     @endif
                 </div>
             </div>
@@ -287,28 +287,34 @@
                 <div class="details-card">
                     <h3 class="details-title">Credit Note Details</h3>
                     <div class="details-grid clearfix">
-                        @if(!empty($data['Reference']))
+                        @if(!empty($data['reference']))
                         <div class="detail-row">
                             <span class="detail-label">Reference:</span>
-                            <span class="detail-value">{{ $data['Reference'] }}</span>
+                            <span class="detail-value">{{ $data['reference'] }}</span>
                         </div>
                         @endif
-                        @if(!empty($data['Date']))
+                        @if(!empty($data['date']))
                         <div class="detail-row">
                             <span class="detail-label">Date:</span>
-                            <span class="detail-value">{{ $data['Date'] }}</span>
+                            <span class="detail-value">{{ $data['date'] }}</span>
                         </div>
                         @endif
-                        @if(!empty($data['Number']))
-                        <div class="detail-row">
-                            <span class="detail-label">Number:</span>
-                            <span class="detail-value">{{ $data['Number'] }}</span>
-                        </div>
-                        @endif
-                        @if(!empty($data['Type']))
+                        @if(!empty($data['type']))
                         <div class="detail-row">
                             <span class="detail-label">Type:</span>
-                            <span class="detail-value">{{ $data['Type'] }}</span>
+                            <span class="detail-value">{{ $data['type'] }}</span>
+                        </div>
+                        @endif
+                        @if(!empty($data['customer']))
+                        <div class="detail-row">
+                            <span class="detail-label">Customer:</span>
+                            <span class="detail-value">{{ $data['customer'] }}</span>
+                        </div>
+                        @endif
+                        @if(!empty($data['details']))
+                        <div class="detail-row">
+                            <span class="detail-label">Details:</span>
+                            <span class="detail-value">{{ $data['details'] }}</span>
                         </div>
                         @endif
                     </div>
@@ -326,28 +332,28 @@
                             </tr>
                         </thead>
                         <tbody>
-                            @if(!empty($data['Net GBP']))
+                            @if(!empty($data['net']))
                             <tr>
                                 <td>Net Amount</td>
-                                <td>£{{ $data['Net GBP'] }}</td>
+                                <td>£{{ $data['net'] }}</td>
                             </tr>
                             @endif
-                            @if(!empty($data['VAT GBP']))
+                            @if(!empty($data['vat']))
                             <tr>
                                 <td>VAT Amount</td>
-                                <td>£{{ $data['VAT GBP'] }}</td>
+                                <td>£{{ $data['vat'] }}</td>
                             </tr>
                             @endif
-                            @if(!empty($data['Discount GBP']))
+                            @if(!empty($data['discount']))
                             <tr>
                                 <td>Discount Applied</td>
-                                <td>-£{{ $data['Discount GBP'] }}</td>
+                                <td>-£{{ $data['discount'] }}</td>
                             </tr>
                             @endif
-                            @if(!empty($data['Total GBP']))
+                            @if(!empty($data['total']))
                             <tr class="total-row">
                                 <td>Total Credit Amount</td>
-                                <td>£{{ $data['Total GBP'] }}</td>
+                                <td>£{{ $data['total'] }}</td>
                             </tr>
                             @endif
                         </tbody>

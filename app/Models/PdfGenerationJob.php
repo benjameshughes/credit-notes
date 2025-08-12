@@ -18,6 +18,7 @@ class PdfGenerationJob extends Model
         'processed_rows',
         'failed_rows',
         'status',
+        'download_status',
         'file_paths',
         'zip_path',
         'single_pdf_path',
@@ -61,7 +62,7 @@ class PdfGenerationJob extends Model
         // Delete individual PDF files
         if ($this->file_paths && is_array($this->file_paths)) {
             foreach ($this->file_paths as $filePath) {
-                $fullPath = storage_path('app/' . $filePath);
+                $fullPath = storage_path('app/'.$filePath);
                 if (file_exists($fullPath)) {
                     unlink($fullPath);
                 }
@@ -70,7 +71,7 @@ class PdfGenerationJob extends Model
 
         // Delete ZIP file
         if ($this->zip_path) {
-            $fullZipPath = storage_path('app/' . $this->zip_path);
+            $fullZipPath = storage_path('app/'.$this->zip_path);
             if (file_exists($fullZipPath)) {
                 unlink($fullZipPath);
             }
@@ -78,7 +79,7 @@ class PdfGenerationJob extends Model
 
         // Delete single PDF file
         if ($this->single_pdf_path) {
-            $fullSinglePdfPath = storage_path('app/' . $this->single_pdf_path);
+            $fullSinglePdfPath = storage_path('app/'.$this->single_pdf_path);
             if (file_exists($fullSinglePdfPath)) {
                 unlink($fullSinglePdfPath);
             }

@@ -4,24 +4,25 @@
 
 namespace App\Jobs;
 
+use App\Events\BatchCompleted;
 use App\Models\PdfGenerationJob;
-use Spatie\LaravelPdf\Facades\Pdf;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
-use ZipArchive;
+use Spatie\LaravelPdf\Facades\Pdf;
 
 class ProcessCsvToPdf implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public $timeout = 3600; // 1 hour timeout
+
+    public $tries = 3; // Retry up to 3 times
+
+    public $backoff = [60, 300, 900]; // Wait 1 minute, 5 minutes, then 15 minutes between retries
 
     public function __construct(
         public int $jobId,
@@ -57,6 +58,9 @@ class ProcessCsvToPdf implements ShouldQueue
                     'status' => 'failed',
                 ]);
             }
+            
+            // Check if this was the last job to complete
+            $this->checkBatchCompletion($job);
 
         } catch (\Exception $e) {
             // Ensure status is always updated on exception
@@ -66,18 +70,14 @@ class ProcessCsvToPdf implements ShouldQueue
                     'failed_rows' => 1,
                     'status' => 'failed',
                 ]);
+                
+                // Check if this was the last job even though it failed
+                $this->checkBatchCompletion($job);
             } catch (\Exception $updateException) {
                 Log::error('Failed to update job status after exception: '.$updateException->getMessage());
             }
 
             Log::error("PDF generation failed for job {$this->jobId}: ".$e->getMessage());
-        } finally {
-            // Always check batch completion
-            try {
-                $this->checkBatchCompletion($job->batch_id);
-            } catch (\Exception $e) {
-                Log::error("Error in finally block for job {$this->jobId}: ".$e->getMessage());
-            }
         }
     }
 
@@ -86,8 +86,8 @@ class ProcessCsvToPdf implements ShouldQueue
         try {
             // Create filename using credit note number or fallback
             $filename = 'credit_note_';
-            if (! empty($data['Reference'])) {
-                $filename .= $data['Reference'];
+            if (! empty($data['reference'])) {
+                $filename .= $data['reference'];
             } else {
                 $filename .= ($index + 1);
             }
@@ -98,7 +98,7 @@ class ProcessCsvToPdf implements ShouldQueue
 
             // Ensure directory exists
             $directory = dirname($fullPath);
-            if (!is_dir($directory)) {
+            if (! is_dir($directory)) {
                 mkdir($directory, 0755, true);
             }
 
@@ -116,105 +116,30 @@ class ProcessCsvToPdf implements ShouldQueue
         }
     }
 
-    private function checkBatchCompletion($batchId)
+    private function checkBatchCompletion($job)
     {
-        // Use database locking to prevent race conditions
-        DB::transaction(function () use ($batchId) {
-            $jobs = PdfGenerationJob::where('batch_id', $batchId)
-                ->lockForUpdate()
-                ->get();
-
-            $completedJobs = $jobs->where('status', 'completed');
-            $failedJobs = $jobs->where('status', 'failed');
-            $processingJobs = $jobs->whereIn('status', ['processing', 'pending']);
-
-            // If all jobs are either completed or failed (none processing or pending)
-            if (($completedJobs->count() + $failedJobs->count()) === $jobs->count() && $processingJobs->count() === 0) {
-                // Check if we've already processed this batch
-                $alreadyProcessed = $jobs->whereNotNull('zip_path')->count() > 0 || $jobs->whereNotNull('single_pdf_path')->count() > 0;
-
-                if (! $alreadyProcessed) {
-                    $pdfPaths = [];
-
-                    foreach ($completedJobs as $job) {
-                        $filePaths = json_decode($job->file_paths, true);
-                        if ($filePaths) {
-                            $pdfPaths = array_merge($pdfPaths, $filePaths);
-                        }
-                    }
-
-                    if (! empty($pdfPaths)) {
-                        if (count($pdfPaths) > 1) {
-                            // Multiple PDFs - create ZIP file
-                            $zipPath = $this->createZipFile($pdfPaths, $jobs->first()->original_filename);
-
-                            // Update all jobs in batch with the zip path
-                            PdfGenerationJob::where('batch_id', $batchId)
-                                ->update(['zip_path' => $zipPath]);
-
-                            // Clean up individual PDF files after zipping
-                            $this->cleanup($pdfPaths);
-                        } else {
-                            // Single PDF - keep the individual PDF file
-                            $singlePdfPath = $pdfPaths[0];
-
-                            // Update all jobs in batch with the single PDF path
-                            PdfGenerationJob::where('batch_id', $batchId)
-                                ->update(['single_pdf_path' => $singlePdfPath]);
-                        }
-                    }
-                }
-            }
-        });
-    }
-
-
-    private function createZipFile($pdfPaths, $originalFilename)
-    {
-        $zipFilename = 'pdfs_'. Str::slug(pathinfo($originalFilename, PATHINFO_FILENAME)).'_'.date('Y-m-d_H-i-s').'.zip';
-        $zipPath = 'downloads/'.$zipFilename;
-        $fullZipPath = storage_path('app/'.$zipPath);
-
-        // Ensure directory exists
-        $dir = dirname($fullZipPath);
-        if (! is_dir($dir)) {
-            mkdir($dir, 0755, true);
-        }
-
-        $zip = new ZipArchive;
-        $result = $zip->open($fullZipPath, ZipArchive::CREATE);
-
-        if ($result === true) {
-            $addedFiles = 0;
-            foreach ($pdfPaths as $pdfPath) {
-                $fullPdfPath = Storage::path($pdfPath);
-                if (file_exists($fullPdfPath)) {
-                    if ($zip->addFile($fullPdfPath, basename($pdfPath))) {
-                        $addedFiles++;
-                    }
-                }
-            }
+        // Simple check - count remaining jobs
+        $totalJobs = PdfGenerationJob::where('batch_id', $job->batch_id)->count();
+        $completedJobs = PdfGenerationJob::where('batch_id', $job->batch_id)
+            ->whereIn('status', ['completed', 'failed'])
+            ->count();
             
-            $zip->close();
-            
-            // Verify the ZIP file was actually created and has content
-            if (file_exists($fullZipPath) && filesize($fullZipPath) > 0) {
-                Log::info("ZIP file created successfully: {$zipPath} with {$addedFiles} files");
-                return $zipPath;
+        Log::info("Batch {$job->batch_id}: {$completedJobs}/{$totalJobs} jobs completed");
+        
+        // If all jobs are complete, dispatch the batch completed event
+        if ($completedJobs >= $totalJobs) {
+            // Check if batch is already processed (has download paths) 
+            $alreadyProcessed = PdfGenerationJob::where('batch_id', $job->batch_id)
+                ->whereNotNull('zip_path')
+                ->exists();
+                
+            if (!$alreadyProcessed) {
+                Log::info("Batch {$job->batch_id} is complete - dispatching BatchCompleted event");
+                BatchCompleted::dispatch($job->batch_id, $job->user_id);
             } else {
-                Log::error("ZIP file was not created properly: {$zipPath}");
-                throw new \Exception('ZIP file was not created properly');
+                Log::info("Batch {$job->batch_id} already processed");
             }
         }
-
-        Log::error("Could not open ZIP file for creation: {$zipPath}, error code: {$result}");
-        throw new \Exception("Could not create zip file. Error code: {$result}");
     }
 
-    private function cleanup($pdfPaths)
-    {
-        foreach ($pdfPaths as $path) {
-            Storage::delete($path);
-        }
-    }
 }

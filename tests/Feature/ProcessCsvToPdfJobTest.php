@@ -6,7 +6,6 @@ use App\Models\User;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Spatie\LaravelPdf\Facades\Pdf;
-use Spatie\LaravelPdf\PdfBuilder;
 
 beforeEach(function () {
     Storage::fake('local');
@@ -15,7 +14,7 @@ beforeEach(function () {
 it('processes single csv row and generates pdf successfully', function () {
     $user = User::factory()->create();
     $this->actingAs($user);
-    
+
     $rowData = ['Number' => '123', 'Customer' => 'John Doe', 'Amount' => '100.00'];
     $batchId = Str::uuid();
 
@@ -45,7 +44,7 @@ it('processes single csv row and generates pdf successfully', function () {
 it('updates job status to processing when started', function () {
     $user = User::factory()->create();
     $this->actingAs($user);
-    
+
     $rowData = ['Number' => '123', 'Customer' => 'John Doe', 'Amount' => '100.00'];
     $batchId = Str::uuid();
 
@@ -72,7 +71,7 @@ it('updates job status to processing when started', function () {
 it('handles pdf generation for single job', function () {
     $user = User::factory()->create();
     $this->actingAs($user);
-    
+
     $rowData = ['Number' => '123', 'Customer' => 'John Doe', 'Amount' => '100.00'];
     $batchId = Str::uuid();
 
@@ -111,7 +110,7 @@ it('handles missing job record gracefully', function () {
 it('generates pdf with correct filename based on credit note number', function () {
     $user = User::factory()->create();
     $this->actingAs($user);
-    
+
     $rowData = ['Number' => 'CN-2024-001', 'Customer' => 'John Doe', 'Amount' => '100.00'];
     $batchId = Str::uuid();
 
@@ -140,7 +139,7 @@ it('generates pdf with correct filename based on credit note number', function (
 it('handles job failure gracefully', function () {
     $user = User::factory()->create();
     $this->actingAs($user);
-    
+
     // Create a job with invalid data that will cause PDF generation to fail
     $rowData = [];
     $batchId = Str::uuid();

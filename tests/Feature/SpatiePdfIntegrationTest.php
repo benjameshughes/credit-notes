@@ -8,7 +8,7 @@ it('can use Spatie Laravel PDF facade', function () {
     $mockBuilder = Mockery::mock(PdfBuilder::class);
     $mockBuilder->shouldReceive('format')->with('a4')->once()->andReturnSelf();
     $mockBuilder->shouldReceive('save')->with(Mockery::type('string'))->once()->andReturnSelf();
-    
+
     Pdf::shouldReceive('view')
         ->with('pdf.credit-note-template', ['data' => ['Number' => '123']])
         ->once()
@@ -29,19 +29,20 @@ it('verifies pdf template exists', function () {
 
 it('can render pdf template with test data', function () {
     $data = [
-        'Reference' => 'CN-2024-001',
-        'Number' => '123',
-        'Date' => '01/01/2024',
-        'Type' => 'Credit Note',
-        'Net GBP' => '83.33',
-        'VAT GBP' => '16.67',
-        'Total GBP' => '100.00',
+        'reference' => 'CN-2024-001',
+        'customer' => 'Test Customer',
+        'date' => '01/01/2024',
+        'type' => 'Credit Note',
+        'details' => 'Test product description',
+        'net' => '83.33',
+        'vat' => '16.67',
+        'total' => '100.00',
     ];
 
     $html = view('pdf.credit-note-template', compact('data'))->render();
-    
+
     expect($html)
         ->toContain('CN-2024-001')
-        ->toContain('123')
-        ->toContain('£100.00');
+        ->toContain('Test Customer')
+        ->toContain('83.33');
 });

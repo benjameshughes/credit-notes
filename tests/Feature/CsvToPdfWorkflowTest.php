@@ -25,19 +25,24 @@ it('completes full csv to pdf workflow successfully', function () {
     $file = UploadedFile::fake()->createWithContent('credit_notes.csv', $csvContent);
 
     // Step 1: Upload CSV through Livewire component
-    Livewire::test(CsvToPdfProcessor::class)
+    $component = Livewire::test(CsvToPdfProcessor::class)
         ->set('csvFile', $file)
         ->call('uploadCsv')
         ->assertHasNoErrors()
-        ->assertSessionHas('success');
+        ->assertSet('showMapping', true);
 
-    // Verify job was created
-    expect(PdfGenerationJob::count())->toBe(1);
+    // Step 2: Confirm mapping and process
+    $component->call('confirmMapping')
+        ->assertSet('messageType', 'success')
+        ->assertSet('message', function ($message) {
+            return str_contains($message, 'Processing 3 records');
+        });
 
-    $job = PdfGenerationJob::first();
-    expect($job->original_filename)->toBe('credit_notes.csv')
-        ->and($job->total_rows)->toBe(3)
-        ->and($job->status)->toBe('pending');
+    // Verify jobs were created - one per CSV row
+    expect(PdfGenerationJob::count())->toBe(3);
+
+    $jobs = PdfGenerationJob::all();
+    expect($jobs->first()->original_filename)->toBe('credit_notes.csv');
 
     // Verify queue jobs were dispatched - one for each row
     Queue::assertPushed(ProcessCsvToPdf::class, 3);
@@ -49,7 +54,10 @@ it('handles empty csv file workflow', function () {
     Livewire::test(CsvToPdfProcessor::class)
         ->set('csvFile', $file)
         ->call('uploadCsv')
-        ->assertSessionHas('error');
+        ->assertSet('messageType', 'error')
+        ->assertSet('message', function ($message) {
+            return str_contains($message, 'empty');
+        });
 
     // No job should be created for empty CSV
     expect(PdfGenerationJob::count())->toBe(0);
@@ -62,7 +70,10 @@ it('handles csv with only headers workflow', function () {
     Livewire::test(CsvToPdfProcessor::class)
         ->set('csvFile', $file)
         ->call('uploadCsv')
-        ->assertSessionHas('error');
+        ->assertSet('messageType', 'error')
+        ->assertSet('message', function ($message) {
+            return str_contains($message, 'empty');
+        });
 
     expect(PdfGenerationJob::count())->toBe(0);
 });
@@ -78,12 +89,13 @@ it('refreshes job list after successful upload', function () {
 
     $component = Livewire::test(CsvToPdfProcessor::class);
 
-    // Upload new CSV
+    // Upload new CSV and confirm mapping
     $component->set('csvFile', $file)
         ->call('uploadCsv')
-        ->assertHasNoErrors();
+        ->assertHasNoErrors()
+        ->call('confirmMapping');
 
-    // Verify new job was created
+    // Verify new job was created (2 existing + 1 new CSV row)
     expect(PdfGenerationJob::count())->toBe(3);
 });
 
@@ -113,13 +125,14 @@ it('handles large csv files within limits', function () {
 
     $file = UploadedFile::fake()->createWithContent('large_file.csv', $csvContent);
 
-    Livewire::test(CsvToPdfProcessor::class)
+    $component = Livewire::test(CsvToPdfProcessor::class)
         ->set('csvFile', $file)
         ->call('uploadCsv')
-        ->assertHasNoErrors();
+        ->assertHasNoErrors()
+        ->call('confirmMapping');
 
-    $job = PdfGenerationJob::first();
-    expect($job->total_rows)->toBe(100);
+    // Should create 100 individual jobs, one per row
+    expect(PdfGenerationJob::count())->toBe(100);
 
     Queue::assertPushed(ProcessCsvToPdf::class, 100);
 });

@@ -1,11 +1,11 @@
 <?php
 
-use Spatie\LaravelPdf\Facades\Pdf;
 use Illuminate\Support\Facades\Storage;
+use Spatie\LaravelPdf\Facades\Pdf;
 
 it('can generate a real PDF using Spatie Laravel PDF', function () {
     Storage::fake('local');
-    
+
     $data = [
         'Reference' => 'CN-2024-001',
         'Number' => '123',
@@ -17,7 +17,7 @@ it('can generate a real PDF using Spatie Laravel PDF', function () {
     ];
 
     $filename = 'test-credit-note.pdf';
-    $path = storage_path('app/' . $filename);
+    $path = storage_path('app/'.$filename);
 
     // Generate the PDF
     Pdf::view('pdf.credit-note-template', compact('data'))
@@ -26,16 +26,16 @@ it('can generate a real PDF using Spatie Laravel PDF', function () {
 
     // Verify the file was created
     expect(file_exists($path))->toBeTrue();
-    
+
     // Verify it's a PDF file (starts with PDF signature)
     $content = file_get_contents($path);
     expect($content)->toStartWith('%PDF');
-    
+
     // Cleanup
     unlink($path);
-})->skip(function() {
+})->skip(function () {
     // Skip if Node.js dependencies aren't available for Browsershot
-    return !class_exists('\Spatie\Browsershot\Browsershot');
+    return ! class_exists('\Spatie\Browsershot\Browsershot');
 }, 'Browsershot dependencies not available');
 
 it('verifies that Spatie Laravel PDF is properly installed', function () {

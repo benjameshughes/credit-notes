@@ -11,7 +11,10 @@
       "Bash(git commit:*)",
       "Bash(git push:*)",
       "Bash(grep:*)",
-      "Bash(rg:*)"
+      "Bash(rg:*)",
+      "Bash(vendor/bin/pest:*)",
+      "Bash(rm:*)",
+      "WebFetch(domain:laravel.com)"
     ],
     "deny": []
   }
