@@ -84,6 +84,9 @@ class ProcessCsvToPdf implements ShouldQueue
     private function generatePdf($data, $index, $batchId)
     {
         try {
+            Log::info("Starting PDF generation for job {$this->jobId}, batch {$batchId}, index {$index}");
+            Log::info("PDF data: " . json_encode($data));
+            
             // Create filename using credit note number or fallback
             $filename = 'credit_note_';
             if (! empty($data['reference'])) {
@@ -96,21 +99,27 @@ class ProcessCsvToPdf implements ShouldQueue
             $path = 'pdfs/'.$batchId.'/'.$filename;
             $fullPath = storage_path('app/'.$path);
 
+            Log::info("PDF will be saved to: {$fullPath}");
+
             // Ensure directory exists
             $directory = dirname($fullPath);
             if (! is_dir($directory)) {
+                Log::info("Creating directory: {$directory}");
                 mkdir($directory, 0755, true);
             }
 
             // Use Spatie Laravel PDF to generate PDF
+            Log::info("Calling Spatie PDF generation...");
             Pdf::view('pdf.credit-note-template', compact('data'))
                 ->format('a4')
                 ->save($fullPath);
 
+            Log::info("PDF generated successfully: {$path}");
             return $path;
 
         } catch (\Exception $e) {
-            Log::error('PDF generation error: '.$e->getMessage());
+            Log::error('PDF generation error: ' . $e->getMessage());
+            Log::error('PDF generation stack trace: ' . $e->getTraceAsString());
 
             return null;
         }
