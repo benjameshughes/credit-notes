@@ -110,9 +110,23 @@ class ProcessCsvToPdf implements ShouldQueue
 
             // Use Spatie Laravel PDF to generate PDF
             Log::info("Calling Spatie PDF generation...");
-            Pdf::view('pdf.credit-note-template', compact('data'))
-                ->format('a4')
-                ->save($fullPath);
+            
+            $pdf = Pdf::view('pdf.credit-note-template', compact('data'))
+                ->format('a4');
+                
+            // Add server-safe Chrome arguments
+            $chromeArgs = config('browsershot.chrome_arguments', [
+                '--no-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-gpu',
+                '--single-process',
+            ]);
+            
+            foreach ($chromeArgs as $arg) {
+                $pdf->addChromiumArguments([$arg]);
+            }
+            
+            $pdf->save($fullPath);
 
             Log::info("PDF generated successfully: {$path}");
             return $path;

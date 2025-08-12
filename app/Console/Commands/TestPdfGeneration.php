@@ -51,9 +51,24 @@ class TestPdfGeneration extends Command
             $this->info('Attempting to generate test PDF...');
             $testPath = storage_path('app/test-pdf.pdf');
             
-            Pdf::view('pdf.credit-note-template', ['data' => $testData])
-                ->format('a4')
-                ->save($testPath);
+            $pdf = Pdf::view('pdf.credit-note-template', ['data' => $testData])
+                ->format('a4');
+                
+            // Add server-safe Chrome arguments
+            $chromeArgs = config('browsershot.chrome_arguments', [
+                '--no-sandbox',
+                '--disable-dev-shm-usage', 
+                '--disable-gpu',
+                '--single-process',
+            ]);
+            
+            $this->info('Chrome arguments: ' . implode(' ', $chromeArgs));
+            
+            foreach ($chromeArgs as $arg) {
+                $pdf->addChromiumArguments([$arg]);
+            }
+            
+            $pdf->save($testPath);
                 
             if (file_exists($testPath)) {
                 $fileSize = filesize($testPath);
