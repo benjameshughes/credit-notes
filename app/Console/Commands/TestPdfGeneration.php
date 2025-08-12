@@ -64,9 +64,7 @@ class TestPdfGeneration extends Command
             
             $this->info('Chrome arguments: ' . implode(' ', $chromeArgs));
             
-            foreach ($chromeArgs as $arg) {
-                $pdf->addChromiumArguments([$arg]);
-            }
+            $pdf->chromiumArguments($chromeArgs);
             
             $pdf->save($testPath);
                 

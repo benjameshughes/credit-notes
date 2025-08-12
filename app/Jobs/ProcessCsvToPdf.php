@@ -122,9 +122,7 @@ class ProcessCsvToPdf implements ShouldQueue
                 '--single-process',
             ]);
             
-            foreach ($chromeArgs as $arg) {
-                $pdf->addChromiumArguments([$arg]);
-            }
+            $pdf->chromiumArguments($chromeArgs);
             
             $pdf->save($fullPath);
 
