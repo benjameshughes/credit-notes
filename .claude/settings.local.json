@@ -14,7 +14,8 @@
       "Bash(rg:*)",
       "Bash(vendor/bin/pest:*)",
       "Bash(rm:*)",
-      "WebFetch(domain:laravel.com)"
+      "WebFetch(domain:laravel.com)",
+      "WebFetch(domain:fluxui.dev)"
     ],
     "deny": []
   }

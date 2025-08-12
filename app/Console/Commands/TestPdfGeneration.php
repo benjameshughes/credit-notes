@@ -3,7 +3,7 @@
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
-use Spatie\LaravelPdf\Facades\Pdf;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class TestPdfGeneration extends Command
 {
@@ -15,23 +15,8 @@ class TestPdfGeneration extends Command
         $this->info('Testing PDF generation...');
         
         try {
-            // Check if Node.js is available
-            $this->info('Checking Node.js...');
-            $nodeVersion = shell_exec('node --version 2>&1');
-            $this->info('Node.js version: ' . ($nodeVersion ?: 'NOT FOUND'));
-            
-            // Check if npm is available
-            $this->info('Checking npm...');
-            $npmVersion = shell_exec('npm --version 2>&1');
-            $this->info('npm version: ' . ($npmVersion ?: 'NOT FOUND'));
-            
-            // Check Chromium/Chrome
-            $this->info('Checking for Chrome/Chromium...');
-            $chromeVersion = shell_exec('google-chrome --version 2>&1') ?: 
-                           shell_exec('chromium-browser --version 2>&1') ?: 
-                           shell_exec('chrome --version 2>&1') ?: 
-                           'NOT FOUND';
-            $this->info('Chrome/Chromium: ' . $chromeVersion);
+            // DomPDF doesn't require external dependencies
+            $this->info('✅ Using DomPDF - Pure PHP PDF generation (no external dependencies needed)');
             
             // Test data
             $testData = [
@@ -51,21 +36,9 @@ class TestPdfGeneration extends Command
             $this->info('Attempting to generate test PDF...');
             $testPath = storage_path('app/test-pdf.pdf');
             
-            $pdf = Pdf::view('pdf.credit-note-template', ['data' => $testData])
-                ->format('a4');
+            $pdf = Pdf::loadView('pdf.credit-note-template', ['data' => $testData])
+                ->setPaper('a4', 'portrait');
                 
-            // Add server-safe Chrome arguments
-            $chromeArgs = config('browsershot.chrome_arguments', [
-                '--no-sandbox',
-                '--disable-dev-shm-usage', 
-                '--disable-gpu',
-                '--single-process',
-            ]);
-            
-            $this->info('Chrome arguments: ' . implode(' ', $chromeArgs));
-            
-            $pdf->chromiumArguments($chromeArgs);
-            
             $pdf->save($testPath);
                 
             if (file_exists($testPath)) {

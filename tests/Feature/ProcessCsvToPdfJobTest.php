@@ -5,7 +5,7 @@ use App\Models\PdfGenerationJob;
 use App\Models\User;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use Spatie\LaravelPdf\Facades\Pdf;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 beforeEach(function () {
     Storage::fake('local');
@@ -157,7 +157,7 @@ it('handles job failure gracefully', function () {
     ]);
 
     // Mock PDF generation to throw an exception
-    Pdf::shouldReceive('view')->andThrow(new Exception('PDF generation failed'));
+    Pdf::shouldReceive('loadView')->andThrow(new Exception('PDF generation failed'));
 
     $processingJob = new ProcessCsvToPdf($job->id, $rowData, 0);
     $processingJob->handle();

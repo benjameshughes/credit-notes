@@ -38,7 +38,7 @@ it('can generate a real PDF using Spatie Laravel PDF', function () {
     return ! class_exists('\Spatie\Browsershot\Browsershot');
 }, 'Browsershot dependencies not available');
 
-it('verifies that Spatie Laravel PDF is properly installed', function () {
-    expect(class_exists('\Spatie\LaravelPdf\Facades\Pdf'))->toBeTrue();
-    expect(class_exists('\Spatie\LaravelPdf\PdfBuilder'))->toBeTrue();
+it('verifies that DomPDF is properly installed', function () {
+    expect(class_exists('\Barryvdh\DomPDF\Facade\Pdf'))->toBeTrue();
+    expect(class_exists('\Dompdf\Dompdf'))->toBeTrue();
 });

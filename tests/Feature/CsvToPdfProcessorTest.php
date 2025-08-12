@@ -75,9 +75,10 @@ it('processes valid csv file successfully', function () {
 
     // Now confirm the mapping
     $component->call('confirmMapping')
-        ->assertSet('messageType', 'success')
-        ->assertSet('message', function ($message) {
-            return str_contains($message, 'Processing 2 records');
+        ->assertSet('toasts', function ($toasts) {
+            return count($toasts) > 0 && 
+                   $toasts[0]['type'] === 'success' && 
+                   str_contains($toasts[0]['message'], 'Processing 2 records');
         });
 
     Bus::assertDispatched(ProcessCsvToPdf::class);
@@ -90,9 +91,10 @@ it('handles empty csv files', function () {
     Livewire::test(CsvToPdfProcessor::class)
         ->set('csvFile', $file)
         ->call('uploadCsv')
-        ->assertSet('messageType', 'error')
-        ->assertSet('message', function ($message) {
-            return str_contains($message, 'empty') || str_contains($message, 'CSV file is empty');
+        ->assertSet('toasts', function ($toasts) {
+            return count($toasts) > 0 && 
+                   $toasts[0]['type'] === 'error' && 
+                   (str_contains($toasts[0]['message'], 'empty') || str_contains($toasts[0]['message'], 'CSV file is empty'));
         });
 });
 
@@ -103,9 +105,10 @@ it('handles malformed csv files', function () {
     Livewire::test(CsvToPdfProcessor::class)
         ->set('csvFile', $file)
         ->call('uploadCsv')
-        ->assertSet('messageType', 'error')
-        ->assertSet('message', function ($message) {
-            return str_contains($message, 'empty') || str_contains($message, 'no valid data');
+        ->assertSet('toasts', function ($toasts) {
+            return count($toasts) > 0 && 
+                   $toasts[0]['type'] === 'error' && 
+                   (str_contains($toasts[0]['message'], 'empty') || str_contains($toasts[0]['message'], 'no valid data'));
         });
 
     // No jobs should be created as all rows are malformed
@@ -123,7 +126,9 @@ it('can delete completed jobs', function () {
 
     Livewire::test(CsvToPdfProcessor::class)
         ->call('deleteJob', $job->batch_id)
-        ->assertSet('messageType', 'success');
+        ->assertSet('toasts', function ($toasts) {
+            return count($toasts) > 0 && $toasts[0]['type'] === 'success';
+        });
 
     expect(PdfGenerationJob::find($job->id))->toBeNull();
 });

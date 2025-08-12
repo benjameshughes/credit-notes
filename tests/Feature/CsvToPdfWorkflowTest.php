@@ -33,9 +33,10 @@ it('completes full csv to pdf workflow successfully', function () {
 
     // Step 2: Confirm mapping and process
     $component->call('confirmMapping')
-        ->assertSet('messageType', 'success')
-        ->assertSet('message', function ($message) {
-            return str_contains($message, 'Processing 3 records');
+        ->assertSet('toasts', function ($toasts) {
+            return count($toasts) > 0 && 
+                   $toasts[0]['type'] === 'success' && 
+                   str_contains($toasts[0]['message'], 'Processing 3 records');
         });
 
     // Verify jobs were created - one per CSV row
@@ -54,9 +55,10 @@ it('handles empty csv file workflow', function () {
     Livewire::test(CsvToPdfProcessor::class)
         ->set('csvFile', $file)
         ->call('uploadCsv')
-        ->assertSet('messageType', 'error')
-        ->assertSet('message', function ($message) {
-            return str_contains($message, 'empty');
+        ->assertSet('toasts', function ($toasts) {
+            return count($toasts) > 0 && 
+                   $toasts[0]['type'] === 'error' && 
+                   str_contains($toasts[0]['message'], 'empty');
         });
 
     // No job should be created for empty CSV
@@ -70,9 +72,10 @@ it('handles csv with only headers workflow', function () {
     Livewire::test(CsvToPdfProcessor::class)
         ->set('csvFile', $file)
         ->call('uploadCsv')
-        ->assertSet('messageType', 'error')
-        ->assertSet('message', function ($message) {
-            return str_contains($message, 'empty');
+        ->assertSet('toasts', function ($toasts) {
+            return count($toasts) > 0 && 
+                   $toasts[0]['type'] === 'error' && 
+                   str_contains($toasts[0]['message'], 'empty');
         });
 
     expect(PdfGenerationJob::count())->toBe(0);
@@ -100,11 +103,11 @@ it('refreshes job list after successful upload', function () {
 });
 
 it('maintains authentication throughout workflow', function () {
-    // Test that unauthenticated users cannot access the component
+    // Test that unauthenticated users can now access the component (public access)
     auth()->logout();
 
     $this->get('/generate')
-        ->assertRedirect('/login');
+        ->assertStatus(200);
 
     // Re-authenticate
     $this->actingAs(User::factory()->create());

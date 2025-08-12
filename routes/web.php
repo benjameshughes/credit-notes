@@ -7,7 +7,7 @@ use App\Livewire\Settings\Profile;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
-    return view('welcome');
+    return redirect()->route('generate');
 })->name('home');
 
 Route::view('dashboard', 'dashboard')
@@ -15,8 +15,7 @@ Route::view('dashboard', 'dashboard')
     ->name('dashboard');
 
 Route::get('generate', CsvToPdfProcessor::class)
-    ->name('generate')
-    ->middleware(['auth', 'verified']);
+    ->name('generate');
 
 Route::get('download/{batchId}', function ($batchId) {
     $job = \App\Models\PdfGenerationJob::where('batch_id', $batchId)
@@ -25,7 +24,7 @@ Route::get('download/{batchId}', function ($batchId) {
         })
         ->first();
 
-    if (! $job || ! auth()->user()->can('download', $job)) {
+    if (! $job) {
         abort(404, 'Download not available');
     }
 
@@ -76,7 +75,7 @@ Route::get('download/{batchId}', function ($batchId) {
 
         fclose($stream);
     }, 200, $headers);
-})->name('download')->middleware(['auth', 'verified']);
+})->name('download');
 
 Route::middleware(['auth'])->group(function () {
     Route::redirect('settings', 'settings/profile');

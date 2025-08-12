@@ -1,23 +1,23 @@
 <?php
 
-use Spatie\LaravelPdf\Facades\Pdf;
-use Spatie\LaravelPdf\PdfBuilder;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Barryvdh\DomPDF\PDF as DomPDFWrapper;
 
-it('can use Spatie Laravel PDF facade', function () {
+it('can use DomPDF facade', function () {
     // Mock the PDF facade to test integration
-    $mockBuilder = Mockery::mock(PdfBuilder::class);
-    $mockBuilder->shouldReceive('format')->with('a4')->once()->andReturnSelf();
-    $mockBuilder->shouldReceive('save')->with(Mockery::type('string'))->once()->andReturnSelf();
+    $mockWrapper = Mockery::mock(DomPDFWrapper::class);
+    $mockWrapper->shouldReceive('setPaper')->with('a4', 'portrait')->once()->andReturnSelf();
+    $mockWrapper->shouldReceive('save')->with(Mockery::type('string'))->once()->andReturnSelf();
 
-    Pdf::shouldReceive('view')
+    Pdf::shouldReceive('loadView')
         ->with('pdf.credit-note-template', ['data' => ['Number' => '123']])
         ->once()
-        ->andReturn($mockBuilder);
+        ->andReturn($mockWrapper);
 
     // Test the PDF generation call
     $data = ['Number' => '123'];
-    $result = Pdf::view('pdf.credit-note-template', compact('data'))
-        ->format('a4')
+    $result = Pdf::loadView('pdf.credit-note-template', compact('data'))
+        ->setPaper('a4', 'portrait')
         ->save('/tmp/test.pdf');
 
     expect($result)->not->toBeNull();
