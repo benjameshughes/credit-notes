@@ -98,12 +98,12 @@
         
         .details-grid {
             width: 100%;
+            display: table;
+            table-layout: fixed;
         }
         
         .detail-row {
-            width: 48%;
-            float: left;
-            margin-right: 2%;
+            display: table-row;
             margin-bottom: 0.75rem;
         }
         
@@ -111,14 +111,20 @@
             color: #4b5563;
             font-weight: 500;
             font-size: 0.875rem;
-            display: inline-block;
-            width: 80px;
+            display: table-cell;
+            width: 120px;
+            padding-right: 1rem;
+            padding-bottom: 0.5rem;
+            vertical-align: top;
         }
         
         .detail-value {
             font-weight: 500;
             font-size: 0.875rem;
-            display: inline;
+            display: table-cell;
+            word-wrap: break-word;
+            vertical-align: top;
+            padding-bottom: 0.5rem;
         }
         
         /* Status Badges */
@@ -286,7 +292,7 @@
             <div class="section">
                 <div class="details-card">
                     <h3 class="details-title">Credit Note Details</h3>
-                    <div class="details-grid clearfix">
+                    <div class="details-grid">
                         @if(!empty($data['reference']))
                         <div class="detail-row">
                             <span class="detail-label">Reference:</span>
